@@ -1,0 +1,22 @@
+def test_func() (of bool)
+    bool test;
+    test = true;
+    bool array[5] arr;
+
+    slice[1..2, 4..6];
+    //comment
+
+    x = a + b * c + d;
+
+    begin
+        while test = true
+            a = a +  b;
+        end
+    end
+end
+
+def test_func_second()
+   {
+        test = false;
+   } until true;
+end

@@ -1,0 +1,95 @@
+{ "id": "node0", "name": "source", "children": [
+{ "id": "node1", "name": "source", "children": [
+{ "id": "node2", "name": "sourceItem", "children": [
+{ "id": "node3", "name": "test_func", "children": [
+{ "id": "node4", "name": "bool"}]
+},
+{ "id": "node5", "name": "listStatement", "children": [
+{ "id": "node6", "name": "var", "children": [
+{ "id": "node7", "name": "bool"},
+{ "id": "node8", "name": "listVarDeclared", "children": [
+{ "id": "node9", "name": "test"}]
+}]
+},
+{ "id": "node10", "name": "listStatement", "children": [
+{ "id": "node11", "name": "assignment", "children": [
+{ "id": "node12", "name": "test"},
+{ "id": "node13", "name": ""}]
+},
+{ "id": "node14", "name": "listStatement", "children": [
+{ "id": "node15", "name": "var", "children": [
+{ "id": "node16", "name": "5", "children": [
+{ "id": "node17", "name": "bool"}]
+},
+{ "id": "node18", "name": "listVarDeclared", "children": [
+{ "id": "node19", "name": "arr"}]
+}]
+},
+{ "id": "node20", "name": "listStatement", "children": [
+{ "id": "node21", "name": "slice", "children": [
+{ "id": "node22", "name": "slice"},
+{ "id": "node23", "name": "listRange", "children": [
+{ "id": "node24", "name": "range", "children": [
+{ "id": "node25", "name": "1"},
+{ "id": "node26", "name": "2"}]
+},
+{ "id": "node27", "name": "listRange", "children": [
+{ "id": "node28", "name": "range", "children": [
+{ "id": "node29", "name": "4"},
+{ "id": "node30", "name": "6"}]
+}]
+}]
+}]
+},
+{ "id": "node31", "name": "listStatement", "children": [
+{ "id": "node32", "name": "block", "children": [
+{ "id": "node33", "name": "listStatement", "children": [
+{ "id": "node34", "name": "loop", "children": [
+{ "id": "node35", "name": "assignment", "children": [
+{ "id": "node36", "name": "test"},
+{ "id": "node37", "name": ""}]
+},
+{ "id": "node38", "name": "listStatement", "children": [
+{ "id": "node39", "name": "var", "children": [
+{ "id": "node40", "name": "int"},
+{ "id": "node41", "name": "listVarDeclared", "children": [
+{ "id": "node42", "name": "assignment", "children": [
+{ "id": "node43", "name": "a"},
+{ "id": "node44", "name": "5"}]
+}]
+}]
+},
+{ "id": "node45", "name": "listStatement", "children": [
+{ "id": "node46", "name": "assignment", "children": [
+{ "id": "node47", "name": "b"},
+{ "id": "node48", "name": "a"}]
+}]
+}]
+}]
+}]
+}]
+}]
+}]
+}]
+}]
+}]
+}]
+}]
+},
+{ "id": "node49", "name": "sourceItem", "children": [
+{ "id": "node50", "name": "test_func_second"},
+{ "id": "node51", "name": "listStatement", "children": [
+{ "id": "node52", "name": "loop", "children": [
+{ "id": "node53", "name": ""},
+{ "id": "node54", "name": "block", "children": [
+{ "id": "node55", "name": "listStatement", "children": [
+{ "id": "node56", "name": "assignment", "children": [
+{ "id": "node57", "name": "test"},
+{ "id": "node58", "name": ""}]
+}]
+}]
+}]
+}]
+}]
+}]
+}
