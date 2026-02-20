@@ -162,8 +162,6 @@ listStatement:
     | { $$ = NULL; }
     ;
 
-/* Expressions, binary, unary, etc. (сохраняем всю логику) */
-
 custom: IDENTIFIER { $$ = $1; };
 
 array: typeRef ARRAY LBRACKET DEC RBRACKET { $$ = createNode("array", $1, NULL, $4 ? $4->value : NULL); };
@@ -219,9 +217,9 @@ expr: unary { $$ = $1; }
     | literal { $$ = $1; }
     ;
 
-binary: expr PLUS expr { $$ = createNode("PLUS", $1, $3, NULL); }
+binary: expr PLUS expr { $$ = createNode("SUM", $1, $3, NULL); }
     | expr MINUS expr { $$ = createNode("MINUS", $1, $3, NULL); }
-    | expr STAR expr { $$ = createNode("STAR", $1, $3, NULL); }
+    | expr STAR expr { $$ = createNode("MUL", $1, $3, NULL); }
     | expr SLASH expr { $$ = createNode("SLASH", $1, $3, NULL); }
     | expr PERCENT expr { $$ = createNode("PERCENT", $1, $3, NULL); }
     | expr EQUAL expr { $$ = createNode("EQUALITY", $1, $3, NULL); }
