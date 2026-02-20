@@ -133,11 +133,11 @@
  return RBRACKET;
  }
 "true"                              {
- yylval.node = createNode("TRUE", NULL, NULL, "");
+ yylval.node = createNode("TRUE", NULL, NULL, "true");
  return TRUE;
  }
 "false"                             {
- yylval.node = createNode("FALSE", NULL, NULL, "");
+ yylval.node = createNode("FALSE", NULL, NULL, "false");
  return FALSE;
  }
 "%"                                 {
@@ -164,11 +164,13 @@
 "&&"                                {
  return AND;
  }
-"+"                                 {
- return PLUS;
+"<<"                                {
+ yylval.node = createNode("SHIFT_LEFT", NULL, NULL, "");
+ return SHIFT_LEFT;
  }
-"-"                                 {
- return MINUS;
+">>"                                {
+ yylval.node = createNode("SHIFT_RIGHT", NULL, NULL, "");
+ return SHIFT_RIGHT;
  }
 "<="                                {
  return LESSTHANEQ;
@@ -182,6 +184,28 @@
 ">"                                 {
  return GREATERTHAN;
  }
+"&"                                 {
+ yylval.node = createNode("BIT_AND", NULL, NULL, "");
+ return BIT_AND;
+ }
+"\|"                                {
+ yylval.node = createNode("BIT_OR", NULL, NULL, "");
+ return BIT_OR;
+ }
+"^"                                 {
+ yylval.node = createNode("BIT_XOR", NULL, NULL, "");
+ return BIT_XOR;
+ }
+"~"                                 {
+ yylval.node = createNode("BIT_NOT", NULL, NULL, "");
+ return BIT_NOT;
+ }
+"+"                                 {
+ return PLUS;
+ }
+"-"                                 {
+ return MINUS;
+ }
 "*"                                 {
  return STAR;
  }
@@ -191,24 +215,25 @@
 ")"                                 {
  return RPAREN;
  }
-"="                                 {
+"=="                                {
  return EQUAL;
+ }
+"="                                 {
+ return ASSIGN;
  }
 [a-zA-Z_][a-zA-Z_0-9]* {
     yylval.node = createNode("IDENTIFIER", NULL, NULL, yytext);
     return IDENTIFIER;
 }
-\/\/.*                               { /* Пропустить комментарии */ }
-\n                                  { /* Пропустить переводы строк */ }
-[ \t]                               { /* Пропустить пробелы и табуляцию */ }
+\/\/.*                               { /* РџСЂРѕРїСѓСЃС‚РёС‚СЊ РєРѕРјРјРµРЅС‚Р°СЂРёРё */ }
+\n                                  { /* РџСЂРѕРїСѓСЃС‚РёС‚СЊ РїРµСЂРµРІРѕРґС‹ СЃС‚СЂРѕРє */ }
+[ \t]                               { /* РџСЂРѕРїСѓСЃС‚РёС‚СЊ РїСЂРѕР±РµР»С‹ Рё С‚Р°Р±СѓР»СЏС†РёСЋ */ }
 .                                   {
-                                        // Обработка нераспознанных символов или ошибок
-                                        fprintf(stderr, "Нераспознанный символ: %s\n", yytext);
+                                        // РћР±СЂР°Р±РѕС‚РєР° РЅРµСЂР°СЃРїРѕР·РЅР°РЅРЅС‹С… СЃРёРјРІРѕР»РѕРІ РёР»Рё РѕС€РёР±РѕРє
+                                        fprintf(stderr, "РќРµСЂР°СЃРїРѕР·РЅР°РЅРЅС‹Р№ СЃРёРјРІРѕР»: %s\n", yytext);
                                     }
 %%
 
-
 int yywrap() {
-    // Your implementation here, typically returning 1 to signal EOF.
     return 1;
 }

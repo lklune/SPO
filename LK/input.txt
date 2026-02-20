@@ -4,7 +4,6 @@ def test_func() (of bool)
     bool array[5] arr;
 
     slice[1..2, 4..6];
-    //comment
 
     x = a + b * c + d;
 

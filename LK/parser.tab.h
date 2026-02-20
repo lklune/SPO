@@ -45,7 +45,7 @@
 extern int yydebug;
 #endif
 /* "%code requires" blocks.  */
-#line 1 ".\\parser.y"
+#line 1 "parser.y"
 
 #include "node.h"
 
@@ -65,46 +65,53 @@ extern int yydebug;
     STAR = 260,                    /* STAR  */
     SLASH = 261,                   /* SLASH  */
     PERCENT = 262,                 /* PERCENT  */
-    EQUAL = 263,                   /* EQUAL  */
-    NOTEQUAL = 264,                /* NOTEQUAL  */
-    LESSTHAN = 265,                /* LESSTHAN  */
-    GREATERTHAN = 266,             /* GREATERTHAN  */
-    LESSTHANEQ = 267,              /* LESSTHANEQ  */
-    GREATERTHANEQ = 268,           /* GREATERTHANEQ  */
-    AND = 269,                     /* AND  */
-    OR = 270,                      /* OR  */
-    NOT = 271,                     /* NOT  */
-    OF = 272,                      /* OF  */
-    ARRAY = 273,                   /* ARRAY  */
-    DEF = 274,                     /* DEF  */
-    END = 275,                     /* END  */
-    BEGIN_BLOCK = 276,             /* BEGIN_BLOCK  */
-    IDENTIFIER = 277,              /* IDENTIFIER  */
-    STR = 278,                     /* STR  */
-    COMMA = 279,                   /* COMMA  */
-    DOUBLE_DOT = 280,              /* DOUBLE_DOT  */
-    CHAR = 281,                    /* CHAR  */
-    BIN = 282,                     /* BIN  */
-    HEX = 283,                     /* HEX  */
-    DEC = 284,                     /* DEC  */
-    TRUE = 285,                    /* TRUE  */
-    FALSE = 286,                   /* FALSE  */
-    IF = 287,                      /* IF  */
-    ELSE = 288,                    /* ELSE  */
-    THAN = 289,                    /* THAN  */
-    WHILE = 290,                   /* WHILE  */
-    UNTIL = 291,                   /* UNTIL  */
-    DO = 292,                      /* DO  */
-    BREAK = 293,                   /* BREAK  */
-    SEMICOLON = 294,               /* SEMICOLON  */
-    LPAREN = 295,                  /* LPAREN  */
-    RPAREN = 296,                  /* RPAREN  */
-    LBRACE = 297,                  /* LBRACE  */
-    RBRACE = 298,                  /* RBRACE  */
-    LBRACKET = 299,                /* LBRACKET  */
-    RBRACKET = 300,                /* RBRACKET  */
-    TYPEDEF = 301,                 /* TYPEDEF  */
-    ARRAY_COMMAS = 302             /* ARRAY_COMMAS  */
+    ASSIGN = 263,                  /* ASSIGN  */
+    EQUAL = 264,                   /* EQUAL  */
+    NOTEQUAL = 265,                /* NOTEQUAL  */
+    LESSTHAN = 266,                /* LESSTHAN  */
+    GREATERTHAN = 267,             /* GREATERTHAN  */
+    LESSTHANEQ = 268,              /* LESSTHANEQ  */
+    GREATERTHANEQ = 269,           /* GREATERTHANEQ  */
+    AND = 270,                     /* AND  */
+    OR = 271,                      /* OR  */
+    NOT = 272,                     /* NOT  */
+    BIT_AND = 273,                 /* BIT_AND  */
+    BIT_OR = 274,                  /* BIT_OR  */
+    BIT_XOR = 275,                 /* BIT_XOR  */
+    SHIFT_LEFT = 276,              /* SHIFT_LEFT  */
+    SHIFT_RIGHT = 277,             /* SHIFT_RIGHT  */
+    BIT_NOT = 278,                 /* BIT_NOT  */
+    OF = 279,                      /* OF  */
+    ARRAY = 280,                   /* ARRAY  */
+    DEF = 281,                     /* DEF  */
+    END = 282,                     /* END  */
+    BEGIN_BLOCK = 283,             /* BEGIN_BLOCK  */
+    IDENTIFIER = 284,              /* IDENTIFIER  */
+    STR = 285,                     /* STR  */
+    COMMA = 286,                   /* COMMA  */
+    DOUBLE_DOT = 287,              /* DOUBLE_DOT  */
+    CHAR = 288,                    /* CHAR  */
+    BIN = 289,                     /* BIN  */
+    HEX = 290,                     /* HEX  */
+    DEC = 291,                     /* DEC  */
+    TRUE = 292,                    /* TRUE  */
+    FALSE = 293,                   /* FALSE  */
+    IF = 294,                      /* IF  */
+    ELSE = 295,                    /* ELSE  */
+    THAN = 296,                    /* THAN  */
+    WHILE = 297,                   /* WHILE  */
+    UNTIL = 298,                   /* UNTIL  */
+    DO = 299,                      /* DO  */
+    BREAK = 300,                   /* BREAK  */
+    SEMICOLON = 301,               /* SEMICOLON  */
+    LPAREN = 302,                  /* LPAREN  */
+    RPAREN = 303,                  /* RPAREN  */
+    LBRACE = 304,                  /* LBRACE  */
+    RBRACE = 305,                  /* RBRACE  */
+    LBRACKET = 306,                /* LBRACKET  */
+    RBRACKET = 307,                /* RBRACKET  */
+    TYPEDEF = 308,                 /* TYPEDEF  */
+    ARRAY_COMMAS = 309             /* ARRAY_COMMAS  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -113,11 +120,11 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 15 ".\\parser.y"
+#line 15 "parser.y"
 
     Node* node;
 
-#line 121 "parser.tab.h"
+#line 128 "parser.tab.h"
 
 };
 typedef union YYSTYPE YYSTYPE;
