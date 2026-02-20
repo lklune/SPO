@@ -1,22 +1,25 @@
-.PHONY: run clean
+.PHONY: run clean all
 
-CC=gcc
-CFLAGS=-c
-SOURCES=main.c error.c node.c parser.tab.c lex.yy.c export_ast.c
-OBJECTS=$(SOURCES:.c=.o)
-EXECUTABLE=printer
+CC = gcc
+CFLAGS = -c
+
+SOURCES = main.c error.c node.c parser.tab.c lex.yy.c export_ast.c cfg.c export_cfg.c
+OBJECTS = $(SOURCES:.c=.o)
+EXECUTABLE = printer
 
 # Targets
 
-run: $(EXECUTABLE)
-	chmod +x $(EXECUTABLE)
-	./$(EXECUTABLE) input.txt > diagram.md
+all: $(EXECUTABLE)
 
 $(EXECUTABLE): $(OBJECTS)
-	$(CC) $(OBJECTS) -o $@
+	$(CC) $(LDFLAGS) $(OBJECTS) -o $@
 
-.cpp.o:
-	$(CC) $(CFLAGS) $< -o $@
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+run: $(EXECUTABLE)
+	chmod +x $(EXECUTABLE)
+	./$(EXECUTABLE) input.txt
 
 clean:
-	rm -rf *.o $(EXECUTABLE)
+	rm -rf *.o $(EXECUTABLE) *.dot *.json

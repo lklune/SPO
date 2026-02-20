@@ -5,8 +5,8 @@
 #include "parser.tab.h"
 #include "error.h"
 
-int yylex(void);              // прототип лексера
-void yyerror(const char *s);  // прототип функции обработки ошибок
+int yylex(void);              // РїСЂРѕС‚РѕС‚РёРї Р»РµРєСЃРµСЂР°
+void yyerror(const char *s);  // РїСЂРѕС‚РѕС‚РёРї С„СѓРЅРєС†РёРё РѕР±СЂР°Р±РѕС‚РєРё РѕС€РёР±РѕРє
 %}
 
 %debug
