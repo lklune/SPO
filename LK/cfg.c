@@ -1,14 +1,11 @@
 /*
- * cfg.c
- * Реализация построения графа потока управления (CFG) из дерева разбора (AST)
+ * cfg.c -- Реализация построения графа потока управления (CFG) из дерева разбора (AST)
  */
 
 #include "cfg.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
- /* ===================== Operation ===================== */
 
 Operation* createOperation(char* op_type, Operation* left, Operation* right,
     const char* value, int line_number) {
@@ -33,8 +30,6 @@ void freeOperation(Operation* op) {
     free(op);
 }
 
-/* ===================== BasicBlock ===================== */
-
 BasicBlock* createBasicBlock(int id) {
     BasicBlock* bb = (BasicBlock*)malloc(sizeof(BasicBlock));
     if (!bb) return NULL;
@@ -49,7 +44,6 @@ BasicBlock* createBasicBlock(int id) {
     return bb;
 }
 
-/* Присоединить операцию к блоку (список через next-указатель) */
 void addOperationToBlock(BasicBlock* block, Operation* op) {
     if (!block || !op) return;
     if (!block->operations) {
@@ -69,7 +63,7 @@ void freeBasicBlock(BasicBlock* block) {
     free(block);
 }
 
-/* ===================== CFG ===================== */
+// CFG
 
 CFG* createCFG(void) {
     CFG* cfg = (CFG*)malloc(sizeof(CFG));
@@ -98,8 +92,6 @@ void freeCFG(CFG* cfg) {
     }
     free(cfg);
 }
-
-/* ===================== Function ===================== */
 
 Function* createFunction(FunctionSignature* signature, CFG* cfg,
     const char* source_file) {
@@ -131,8 +123,6 @@ void freeFunction(Function* func) {
     free(func->source_file);
     free(func);
 }
-
-/* ===================== Collections ===================== */
 
 FileCollection* createFileCollection(void) {
     FileCollection* fc = (FileCollection*)malloc(sizeof(FileCollection));
@@ -224,10 +214,6 @@ void freeAnalysisResult(AnalysisResult* result) {
     free(result);
 }
 
-/* ============================================================
- *  Вспомогательный контекст обхода AST
- * ============================================================ */
-
 typedef struct BuildCtx {
     CFG* cfg;
     ErrorCollection* errors;
@@ -274,10 +260,8 @@ static Operation* exprToOp(Node* node) {
 }
 
 /*
- * Основной рекурсивный обход.
  * current  — текущий (активный) базовый блок, в который пишем инструкции
  * Возвращает блок, который является «выходом» из данного поддерева —
- * следующий код нужно добавлять в него.
  * after_block — блок, который следует после всей конструкции (для break)
  */
 static BasicBlock* buildBlock(BuildCtx* ctx, Node* node,
@@ -349,17 +333,6 @@ static BasicBlock* buildBlock(BuildCtx* ctx, Node* node,
 
     /* ---- IF ---- */
     if (strcmp(t, "if") == 0) {
-        /*
-         * В parser.y:
-         *   $$ = createNode("if", $2, $3, NULL);  // left=cond, right=then
-         *   if ($4) $$->right = $4;               // right перезаписывается на else!
-         *
-         * Итого:
-         *   • есть else  → node->right->type == "else",
-         *                   node->right->left == тело else,
-         *                   then-ветка потеряна (баг парсера)
-         *   • нет else   → node->right == then-statement
-         */
         Operation* cond_op = exprToOp(node->left);
         addOperationToBlock(current, createOperation("IF_COND", cond_op, NULL, NULL, 0));
 
@@ -367,8 +340,6 @@ static BasicBlock* buildBlock(BuildCtx* ctx, Node* node,
 
         if (node->right && node->right->type &&
             strcmp(node->right->type, "else") == 0) {
-            /* Есть else: then-ветка потеряна парсером →
-             * true-ребро ведёт прямо в merge (пустой then). */
             BasicBlock* else_block = newBlock(ctx);
 
             current->true_target = merge_block;
@@ -380,7 +351,6 @@ static BasicBlock* buildBlock(BuildCtx* ctx, Node* node,
                 else_end->true_target = merge_block;
         }
         else {
-            /* Нет else */
             BasicBlock* then_block = newBlock(ctx);
 
             current->true_target = then_block;
@@ -397,22 +367,6 @@ static BasicBlock* buildBlock(BuildCtx* ctx, Node* node,
 
     /* ---- loop: while / until ---- */
     if (strcmp(t, "loop") == 0) {
-        /*
-         * node->left  = condition
-         * node->right = body (listStatement)
-         * node->value = "while" | "until"
-         *
-         * Структура:
-         *   current ──► cond_block ──true──► body_block ──► ... ──► cond_block
-         *                   │
-         *                 false
-         *                   │
-         *               exit_block   ← возвращаем как «продолжение»
-         *
-         * ВАЖНО: устанавливаем current->true_target только если он ещё не задан.
-         * Иначе при двух циклах подряд exit_block первого (= current на входе)
-         * потеряет своё false-ребро.
-         */
         BasicBlock* cond_block = newBlock(ctx);
         BasicBlock* body_block = newBlock(ctx);
         BasicBlock* exit_block = newBlock(ctx);
@@ -442,11 +396,6 @@ static BasicBlock* buildBlock(BuildCtx* ctx, Node* node,
 
     /* ---- repeat: statement while/until expr; ---- */
     if (strcmp(t, "repeat") == 0) {
-        /*
-         * node->left  = body statement
-         * node->right = condition
-         * node->value = "while" | "until"
-         */
         BasicBlock* body_block = newBlock(ctx);
         BasicBlock* cond_block = newBlock(ctx);
         BasicBlock* exit_block = newBlock(ctx);
@@ -489,7 +438,6 @@ static BasicBlock* buildBlock(BuildCtx* ctx, Node* node,
          * но ни одно ребро к нему не ведёт — в граф он не попадёт.
          */
         BasicBlock* dead = newBlock(ctx);
-        /* намеренно не подключаем dead ни к чему */
         return dead;
     }
 
@@ -511,9 +459,6 @@ static BasicBlock* buildBlock(BuildCtx* ctx, Node* node,
     return current;
 }
 
-/* ============================================================
- *  Построение CFG одной функции из sourceItem
- * ============================================================ */
 static Function* buildFunctionCFG(Node* sourceItem, const char* filename,
     ErrorCollection* errors) {
     if (!sourceItem) return NULL;
@@ -608,9 +553,6 @@ static Function* buildFunctionCFG(Node* sourceItem, const char* filename,
     return createFunction(sig, cfg, filename);
 }
 
-/* ============================================================
- *  Обход source: source -> source sourceItem | пусто
- * ============================================================ */
 static void collectSourceItems(Node* node, Node** items, int* count, int max) {
     if (!node) return;
     if (node->type && strcmp(node->type, "source") == 0) {
@@ -622,9 +564,6 @@ static void collectSourceItems(Node* node, Node** items, int* count, int max) {
     }
 }
 
-/* ============================================================
- *  Главный интерфейс: buildCFGFromAST
- * ============================================================ */
 AnalysisResult* buildCFGFromAST(FileCollection* file_collection) {
     FunctionCollection* funcs = createFunctionCollection();
     ErrorCollection* errors = createErrorCollection();

@@ -2,9 +2,6 @@
  * main.c
  * Тестовая программа: разбор входных файлов, построение CFG,
  * экспорт в DOT-файлы.
- *
- * Использование:
- *   printer [-o <outdir>] <file1> [file2 ...]
  */
 
 #include <stdio.h>
@@ -17,11 +14,9 @@
 #include "cfg.h"
 #include "export_cfg.h"
 
- /* Bison / Flex */
 extern FILE* yyin;
 extern int   yyparse(void);
 
-/* из node.c */
 extern Node** allNodes;
 extern size_t allNodesCount;
 
