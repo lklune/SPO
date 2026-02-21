@@ -6,6 +6,7 @@ def test_func() (of bool)
     slice[1..2, 4..6];
 
     x = a + b * c + d;
+    z = a * b + c * d;
 
     begin
         while test = true

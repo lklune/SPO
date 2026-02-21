@@ -24,8 +24,9 @@ $(BIN): $(OBJ)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 run: build
-	./$(BIN) main.txt math.txt control.txt
-#	./$(BIN) input.txt
+#	./$(BIN) main.txt 
+#	math.txt control.txt
+	./$(BIN) input.txt
 
 clean:
 	rm -f $(BIN) $(SRC_DIR)/*.o \

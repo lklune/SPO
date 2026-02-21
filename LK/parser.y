@@ -169,10 +169,9 @@ array: typeRef ARRAY LBRACKET DEC RBRACKET { $$ = createNode("array", $1, NULL, 
 /* IF ELSE */
 
 if: IF expr THAN statement optionalElseStatement { 
-        $$ = createNode("if", $2, $3, NULL);
-        if ($4) {
-            $$->right = $4;
-        }
+        /* left = условие, right = if_body(left=then, right=else) */
+        Node* if_body = createNode("if_body", $4, $5, NULL);
+        $$ = createNode("if", $2, if_body, NULL);
     };
 
 optionalElseStatement: 

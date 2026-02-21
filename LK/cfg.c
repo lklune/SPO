@@ -331,35 +331,58 @@ static BasicBlock* buildBlock(BuildCtx* ctx, Node* node,
         return buildBlock(ctx, node->left, current, after_block);
     }
 
+    /* ---- if_body (внутренний узел if: left=then, right=else) ---- */
+    if (strcmp(t, "if_body") == 0) {
+        /* Не должен вызываться напрямую — обрабатывается внутри "if" */
+        return buildBlock(ctx, node->left, current, after_block);
+    }
+
     /* ---- IF ---- */
     if (strcmp(t, "if") == 0) {
+        /* Структура: if->left = условие, if->right = if_body(left=then, right=else|NULL) */
         Operation* cond_op = exprToOp(node->left);
         addOperationToBlock(current, createOperation("IF_COND", cond_op, NULL, NULL, 0));
 
         BasicBlock* merge_block = newBlock(ctx);
 
-        if (node->right && node->right->type &&
-            strcmp(node->right->type, "else") == 0) {
-            BasicBlock* else_block = newBlock(ctx);
+        Node* if_body = node->right; /* if_body узел */
+        Node* then_node = if_body ? if_body->left : NULL;
+        Node* else_node = if_body ? if_body->right : NULL;
 
-            current->true_target = merge_block;
-            current->false_target = else_block;
+        /* Создаём then-блок */
+        BasicBlock* then_block = newBlock(ctx);
+        current->true_target = then_block;
 
-            BasicBlock* else_end = buildBlock(ctx, node->right->left,
-                else_block, after_block);
-            if (else_end && !else_end->true_target)
-                else_end->true_target = merge_block;
+        BasicBlock* then_end = buildBlock(ctx, then_node, then_block, after_block);
+        if (then_end && !then_end->true_target)
+            then_end->true_target = merge_block;
+
+        if (else_node) {
+            /* Итерируемся по цепочке "else"-узлов:
+             * каждый "else": left = тело ветки, right = следующий "else" или NULL.
+             * cur_cond_block — блок, чья false-ветка ведёт к очередному else. */
+            BasicBlock* cur_cond_block = current;
+            Node* cur_else = else_node;
+
+            while (cur_else && cur_else->type && strcmp(cur_else->type, "else") == 0) {
+                BasicBlock* else_body_block = newBlock(ctx);
+                cur_cond_block->false_target = else_body_block;
+
+                BasicBlock* else_end = buildBlock(ctx, cur_else->left,
+                    else_body_block, after_block);
+                if (else_end && !else_end->true_target)
+                    else_end->true_target = merge_block;
+
+                cur_cond_block = else_body_block;
+                cur_else = cur_else->right;
+            }
+            /* Последняя false-ветка (цепочка исчерпана) → merge */
+            if (!cur_cond_block->false_target)
+                cur_cond_block->false_target = merge_block;
         }
         else {
-            BasicBlock* then_block = newBlock(ctx);
-
-            current->true_target = then_block;
+            /* Нет else — false ведёт сразу к merge */
             current->false_target = merge_block;
-
-            BasicBlock* then_end = buildBlock(ctx, node->right,
-                then_block, after_block);
-            if (then_end && !then_end->true_target)
-                then_end->true_target = merge_block;
         }
 
         return merge_block;
