@@ -350,59 +350,46 @@ static BasicBlock* buildBlock(BuildCtx* ctx, Node* node,
     /* ---- IF ---- */
     if (strcmp(t, "if") == 0) {
         /*
-         * node->left  = condition expr
-         * node->right = then-statement  (может быть listStatement или else)
-         * В парсере: if: IF expr THAN statement optionalElseStatement
-         * В createNode("if", $2, $3, NULL) — $2=condition, $3=then
-         * optionalElseStatement идёт в $$->right = $4  (внутри action)
+         * В parser.y:
+         *   $$ = createNode("if", $2, $3, NULL);  // left=cond, right=then
+         *   if ($4) $$->right = $4;               // right перезаписывается на else!
          *
-         * Смотрим на right: если там "else" — разбираем.
+         * Итого:
+         *   • есть else  → node->right->type == "else",
+         *                   node->right->left == тело else,
+         *                   then-ветка потеряна (баг парсера)
+         *   • нет else   → node->right == then-statement
          */
         Operation* cond_op = exprToOp(node->left);
         addOperationToBlock(current, createOperation("IF_COND", cond_op, NULL, NULL, 0));
 
-        BasicBlock* then_block = newBlock(ctx);
         BasicBlock* merge_block = newBlock(ctx);
 
-        current->true_target = then_block;
-        current->false_target = merge_block;
-
-        /* then */
-        BasicBlock* then_end = buildBlock(ctx, node->right, then_block, after_block);
-        if (then_end) then_end->true_target = merge_block;
-
-        /* else (если есть) — правый потомок then-узла — нет,
-         * в парсере else сохраняется в $$->right после создания "if".
-         * Проверяем: node->right может быть или statement, или listStatement.
-         * else сохраняется отдельно — в parser.y: $$->right = $4 (optionalElse)
-         * $4 имеет тип "else". Разберём отдельно.
-         */
-         /* На самом деле в parser.y:
-          *   $$ = createNode("if", $2, $3, NULL);  // left=cond, right=then
-          *   if ($4) $$->right = $4;               // right перезаписывается на else!
-          * Значит если есть else, node->right = else-node, а then потерян?
-          * Это баг парсера, но работаем с тем что есть.
-          * Если node->right->type == "else", то then = NULL (потерян), else = node->right->left
-          * Иначе then = node->right.
-          */
-          /* Переделаем: */
-        then_end = then_block; /* сброс */
         if (node->right && node->right->type &&
             strcmp(node->right->type, "else") == 0) {
-            /* then потерян — только else */
+            /* Есть else: then-ветка потеряна парсером →
+             * true-ребро ведёт прямо в merge (пустой then). */
             BasicBlock* else_block = newBlock(ctx);
+
+            current->true_target = merge_block;
             current->false_target = else_block;
-            /* then_block остаётся пустым, ведёт в merge */
-            then_block->true_target = merge_block;
 
             BasicBlock* else_end = buildBlock(ctx, node->right->left,
                 else_block, after_block);
-            if (else_end) else_end->true_target = merge_block;
+            if (else_end && !else_end->true_target)
+                else_end->true_target = merge_block;
         }
         else {
             /* Нет else */
-            BasicBlock* tend = buildBlock(ctx, node->right, then_block, after_block);
-            if (tend) tend->true_target = merge_block;
+            BasicBlock* then_block = newBlock(ctx);
+
+            current->true_target = then_block;
+            current->false_target = merge_block;
+
+            BasicBlock* then_end = buildBlock(ctx, node->right,
+                then_block, after_block);
+            if (then_end && !then_end->true_target)
+                then_end->true_target = merge_block;
         }
 
         return merge_block;
@@ -414,28 +401,39 @@ static BasicBlock* buildBlock(BuildCtx* ctx, Node* node,
          * node->left  = condition
          * node->right = body (listStatement)
          * node->value = "while" | "until"
+         *
+         * Структура:
+         *   current ──► cond_block ──true──► body_block ──► ... ──► cond_block
+         *                   │
+         *                 false
+         *                   │
+         *               exit_block   ← возвращаем как «продолжение»
+         *
+         * ВАЖНО: устанавливаем current->true_target только если он ещё не задан.
+         * Иначе при двух циклах подряд exit_block первого (= current на входе)
+         * потеряет своё false-ребро.
          */
         BasicBlock* cond_block = newBlock(ctx);
         BasicBlock* body_block = newBlock(ctx);
         BasicBlock* exit_block = newBlock(ctx);
 
-        current->true_target = cond_block;
+        if (!current->true_target)
+            current->true_target = cond_block;
 
         Operation* cond_op = exprToOp(node->left);
         addOperationToBlock(cond_block,
             createOperation("LOOP_COND", cond_op, NULL,
                 node->value ? node->value : "while", 0));
 
-        /* while: вход в тело если условие истинно */
         cond_block->true_target = body_block;
         cond_block->false_target = exit_block;
 
-        /* break внутри тела выходит в exit_block */
         if (ctx->break_depth < 64)
             ctx->break_targets[ctx->break_depth++] = exit_block;
 
         BasicBlock* body_end = buildBlock(ctx, node->right, body_block, exit_block);
-        if (body_end) body_end->true_target = cond_block; /* обратная дуга */
+        if (body_end && !body_end->true_target)
+            body_end->true_target = cond_block; /* обратная дуга */
 
         if (ctx->break_depth > 0) ctx->break_depth--;
 
@@ -453,13 +451,15 @@ static BasicBlock* buildBlock(BuildCtx* ctx, Node* node,
         BasicBlock* cond_block = newBlock(ctx);
         BasicBlock* exit_block = newBlock(ctx);
 
-        current->true_target = body_block;
+        if (!current->true_target)
+            current->true_target = body_block;
 
         if (ctx->break_depth < 64)
             ctx->break_targets[ctx->break_depth++] = exit_block;
 
         BasicBlock* body_end = buildBlock(ctx, node->left, body_block, exit_block);
-        if (body_end) body_end->true_target = cond_block;
+        if (body_end && !body_end->true_target)
+            body_end->true_target = cond_block;
 
         if (ctx->break_depth > 0) ctx->break_depth--;
 
@@ -467,7 +467,7 @@ static BasicBlock* buildBlock(BuildCtx* ctx, Node* node,
         addOperationToBlock(cond_block,
             createOperation("REPEAT_COND", cond_op, NULL,
                 node->value ? node->value : "while", 0));
-        cond_block->true_target = body_block; /* ещё раз */
+        cond_block->true_target = body_block;
         cond_block->false_target = exit_block;
 
         return exit_block;
@@ -483,8 +483,14 @@ static BasicBlock* buildBlock(BuildCtx* ctx, Node* node,
             addErrorToCollection(ctx->errors,
                 "break outside of loop", ctx->filename, 0);
         }
-        /* После break создаём «мёртвый» блок чтобы не прерывать обход */
-        return newBlock(ctx);
+        /*
+         * Код после break в той же ветке недостижим.
+         * Возвращаем изолированный dead-блок: buildList продолжит обход AST,
+         * но ни одно ребро к нему не ведёт — в граф он не попадёт.
+         */
+        BasicBlock* dead = newBlock(ctx);
+        /* намеренно не подключаем dead ни к чему */
+        return dead;
     }
 
     /* ---- sourceItem: определение функции внутри блока ---- */
@@ -584,24 +590,22 @@ static Function* buildFunctionCFG(Node* sourceItem, const char* filename,
 
     BasicBlock* last = buildBlock(&ctx, body_node, entry, NULL);
 
-    /* Всегда создаём отдельный EXIT-блок, чтобы ENTRY не совпадал с EXIT */
+    /*
+     * Всегда создаём явный EXIT-блок.
+     * Последний активный блок (last) подключаем к нему,
+     * если он ещё не имеет исходящего ребра.
+     */
     BasicBlock* exit_block = newBlock(&ctx);
     exit_block->is_exit = 1;
     cfg->exit_block = exit_block;
 
-    if (last && last != entry) {
-        if (!last->true_target)
-            last->true_target = exit_block;
-    }
-    else {
-        if (!entry->true_target)
-            entry->true_target = exit_block;
-    }
+    if (last && !last->true_target && !last->is_exit)
+        last->true_target = exit_block;
 
-    Function* func = createFunction(sig, cfg, filename);
+    if (!entry->true_target)
+        entry->true_target = exit_block;
 
-    /* Освобождаем сигнатуру — она скопирована в createFunction? Нет, передаём владение */
-    return func;
+    return createFunction(sig, cfg, filename);
 }
 
 /* ============================================================

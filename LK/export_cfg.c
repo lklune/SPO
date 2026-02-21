@@ -108,25 +108,58 @@ static void drawAstCluster(FILE* f, int bb_id, Node* ast) {
 /* ================================================================
  *  Экспорт CFG
  * ================================================================ */
+
+ /*
+  * Пометить все блоки, достижимые из entry, с помощью обхода в глубину.
+  * Используется для исключения «мёртвых» блоков из экспорта.
+  */
+#define MAX_BLOCKS 4096
+
+static void markReachable(BasicBlock* bb, int* visited, int max_id) {
+    if (!bb || bb->id < 0 || bb->id >= max_id) return;
+    if (visited[bb->id]) return;
+    visited[bb->id] = 1;
+    markReachable(bb->true_target, visited, max_id);
+    markReachable(bb->false_target, visited, max_id);
+}
+
+/*
+ * Возвращает 1, если CFG тривиален: только ENTRY и EXIT,
+ * соединённые прямым ребром (нет никакого реального кода).
+ * Такие CFG не нужно экспортировать в .dot.
+ */
+static int isTrivialCFG(CFG* cfg) {
+    if (!cfg || !cfg->entry_block) return 0;
+    BasicBlock* entry = cfg->entry_block;
+    /* У entry должен быть ровно один переход (true_target) */
+    if (!entry->true_target || entry->false_target) return 0;
+    /* И этот переход должен вести прямо в exit */
+    return entry->true_target->is_exit ? 1 : 0;
+}
+
 void exportCFGToDot(Function* func, const char* filepath) {
     if (!func || !func->cfg) return;
 
-    /* Пропускаем вырожденные CFG: только ENTRY без содержательных блоков */
-    {
-        int meaningful = 0;
-        BasicBlock* bb = func->cfg->blocks;
-        while (bb) {
-            if (!bb->is_entry && !bb->is_exit && bb->operations)
-            {
-                meaningful = 1; break;
-            }
-            bb = bb->next;
-        }
-        if (!meaningful) return;
-    }
+    /* Проверяем, что CFG не совсем пустой */
+    if (!func->cfg->entry_block) return;
+
+    /* Пропускаем тривиальные CFG: ENTRY → EXIT без кода */
+    if (isTrivialCFG(func->cfg)) return;
 
     FILE* f = fopen(filepath, "w");
     if (!f) { fprintf(stderr, "Cannot open: %s\n", filepath); return; }
+
+    /* Вычисляем максимальный id блока для таблицы достижимости */
+    int max_id = 0;
+    {
+        BasicBlock* bb = func->cfg->blocks;
+        while (bb) { if (bb->id >= max_id) max_id = bb->id + 1; bb = bb->next; }
+    }
+
+    /* Помечаем только достижимые блоки (из entry) */
+    int* reachable = (int*)calloc(max_id, sizeof(int));
+    if (func->cfg->entry_block)
+        markReachable(func->cfg->entry_block, reachable, max_id);
 
     ast_cnt = 0;
     const char* fname = (func->signature && func->signature->name)
@@ -139,6 +172,9 @@ void exportCFGToDot(Function* func, const char* filepath) {
     CFG* cfg = func->cfg;
     BasicBlock* bb = cfg->blocks;
     while (bb) {
+        /* Пропускаем недостижимые (мёртвые) блоки */
+        if (!reachable[bb->id]) { bb = bb->next; continue; }
+
         if (bb->is_entry) {
             fprintf(f, "  cfg_%d [label=\"ENTRY\", shape=circle, style=filled, fillcolor=palegreen];\n", bb->id);
             bb = bb->next; continue;
@@ -173,6 +209,9 @@ void exportCFGToDot(Function* func, const char* filepath) {
 
     bb = cfg->blocks;
     while (bb) {
+        /* Рёбра только из достижимых блоков */
+        if (!reachable[bb->id]) { bb = bb->next; continue; }
+
         if (bb->true_target && bb->false_target) {
             fprintf(f, "  cfg_%d -> cfg_%d [label=\"true\",  color=green];\n", bb->id, bb->true_target->id);
             fprintf(f, "  cfg_%d -> cfg_%d [label=\"false\", color=red];\n", bb->id, bb->false_target->id);
@@ -182,6 +221,8 @@ void exportCFGToDot(Function* func, const char* filepath) {
         }
         bb = bb->next;
     }
+
+    free(reachable);
 
     fprintf(f, "\n  labelloc=\"b\";\n  label=\"CFG: %s\";\n  fontsize=12;\n", fname);
     fprintf(f, "}\n");
