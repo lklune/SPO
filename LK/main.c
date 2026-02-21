@@ -25,8 +25,6 @@ extern int   yyparse(void);
 extern Node** allNodes;
 extern size_t allNodesCount;
 
-/* ------------------------------------------------------------------ */
-
 static void basename_noext(const char* path, char* out, int out_size) {
     const char* p = path;
     const char* last_sep = NULL;
@@ -70,8 +68,6 @@ static Node* parseFile(const char* filename) {
     return allNodes[allNodesCount - 1];
 }
 
-/* ------------------------------------------------------------------ */
-
 int main(int argc, char* argv[]) {
     if (argc < 2) {
         fprintf(stderr, "Usage: %s [-o <outdir>] <file1> [file2 ...]\n", argv[0]);
@@ -91,7 +87,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    /* 1. Разбор всех файлов */
+    // start
     FileCollection* file_col = createFileCollection();
 
     for (int i = first_file; i < argc; i++) {
@@ -100,7 +96,7 @@ int main(int argc, char* argv[]) {
 
         Node* root = parseFile(fname);
         if (!root) {
-            fprintf(stderr, "Skipping file due to parse error: %s\n", fname);
+            fprintf(stderr, "Skipping file to parse error: %s\n", fname);
             continue;
         }
 
@@ -116,11 +112,11 @@ int main(int argc, char* argv[]) {
         addFileToCollection(file_col, fname, root);
     }
 
-    /* 2. Построение CFG */
+    /* Построение CFG */
     printf("\nBuilding CFGs...\n");
     AnalysisResult* result = buildCFGFromAST(file_col);
 
-    /* 3. Ошибки → stderr */
+    /* Ошибки → stderr */
     if (result->errors && result->errors->error_count > 0) {
         Error* e = result->errors->errors;
         while (e) {
@@ -132,7 +128,7 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    /* 4. Экспорт CFG каждой функции */
+    /* Экспорт CFG каждой функции */
     const char* main_func_file = NULL;
 
     Function* func = result->functions->functions;
@@ -162,7 +158,7 @@ int main(int argc, char* argv[]) {
         func = func->next;
     }
 
-    /* 5. Граф вызовов */
+    /* Граф вызовов */
     {
         char cg_dir[512];
         if (outdir)           strncpy(cg_dir, outdir, sizeof(cg_dir) - 1);

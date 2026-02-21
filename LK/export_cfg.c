@@ -1,168 +1,189 @@
 /*
  * export_cfg.c
- * Экспорт CFG одной функции и графа вызовов в формат GraphViz DOT
  */
-
 #include "export_cfg.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-/* ================================================================
- *  Вспомогательные функции
- * ================================================================ */
-
-/* Экранирование строки для DOT-меток */
-static void writeDotEscaped(FILE* f, const char* s) {
+static void esc(FILE* f, const char* s) {
     if (!s) return;
     for (; *s; s++) {
-        switch (*s) {
-            case '"':  fprintf(f, "\\\""); break;
-            case '\\': fprintf(f, "\\\\"); break;
-            case '\n': fprintf(f, "\\n");  break;
-            case '<':  fprintf(f, "\\<"); break;
-            case '>':  fprintf(f, "\\>"); break;
-            case '{':  fprintf(f, "\\{"); break;
-            case '}':  fprintf(f, "\\}"); break;
-            case '|':  fprintf(f, "\\|"); break;
-            default:   fputc(*s, f);      break;
-        }
+        if (*s == '"')  fprintf(f, "\\\"");
+        else if (*s == '\\') fprintf(f, "\\\\");
+        else if (*s == '\n') fprintf(f, "\\n");
+        else               fputc(*s, f);
     }
 }
 
-/* ================================================================
- *  Построение текстового представления дерева операций
- * ================================================================ */
-
-static void opToString(Operation* op, char* buf, int buf_size) {
-    if (!op) { strncpy(buf, "?", buf_size); return; }
-
+static void opStr(Operation* op, char* buf, int sz) {
+    if (!op) { buf[0] = '\0'; return; }
     const char* t = op->op_type ? op->op_type : "";
-    const char* v = op->value   ? op->value   : "";
-
-    /* Листья */
-    if (strcmp(t, "IDENTIFIER") == 0 || strcmp(t, "DEC") == 0 ||
-        strcmp(t, "HEX")        == 0 || strcmp(t, "BIN") == 0 ||
-        strcmp(t, "STR")        == 0 || strcmp(t, "CHAR")== 0 ||
-        strcmp(t, "TRUE")       == 0 || strcmp(t, "FALSE")== 0) {
-        snprintf(buf, buf_size, "%s", *v ? v : t);
-        return;
+    const char* v = op->value ? op->value : "";
+    if (strcmp(t, "IDENTIFIER") == 0 || strcmp(t, "DEC") == 0 || strcmp(t, "HEX") == 0 ||
+        strcmp(t, "BIN") == 0 || strcmp(t, "STR") == 0 || strcmp(t, "CHAR") == 0 ||
+        strcmp(t, "TRUE") == 0 || strcmp(t, "FALSE") == 0) {
+        snprintf(buf, sz, "%s", *v ? v : t); return;
     }
+    char l[256] = "", r[256] = "";
+    if (op->left)  opStr(op->left, l, sizeof(l));
+    if (op->right) opStr(op->right, r, sizeof(r));
+    if (strcmp(t, "assignment") == 0)       snprintf(buf, sz, "%s = %s", l, r);
+    else if (strcmp(t, "SUM") == 0)              snprintf(buf, sz, "%s + %s", l, r);
+    else if (strcmp(t, "MINUS") == 0 && op->right) snprintf(buf, sz, "%s - %s", l, r);
+    else if (strcmp(t, "MINUS") == 0)            snprintf(buf, sz, "-%s", l);
+    else if (strcmp(t, "MUL") == 0)              snprintf(buf, sz, "%s * %s", l, r);
+    else if (strcmp(t, "SLASH") == 0)            snprintf(buf, sz, "%s / %s", l, r);
+    else if (strcmp(t, "PERCENT") == 0)          snprintf(buf, sz, "%s %% %s", l, r);
+    else if (strcmp(t, "EQUALITY") == 0)         snprintf(buf, sz, "%s == %s", l, r);
+    else if (strcmp(t, "NOTEQUAL") == 0)         snprintf(buf, sz, "%s != %s", l, r);
+    else if (strcmp(t, "LESSTHAN") == 0)         snprintf(buf, sz, "%s < %s", l, r);
+    else if (strcmp(t, "GREATERTHAN") == 0)      snprintf(buf, sz, "%s > %s", l, r);
+    else if (strcmp(t, "LESSTHANEQ") == 0)       snprintf(buf, sz, "%s <= %s", l, r);
+    else if (strcmp(t, "GREATERTHANEQ") == 0)    snprintf(buf, sz, "%s >= %s", l, r);
+    else if (strcmp(t, "AND") == 0)              snprintf(buf, sz, "%s && %s", l, r);
+    else if (strcmp(t, "OR") == 0)               snprintf(buf, sz, "%s || %s", l, r);
+    else if (strcmp(t, "NOT") == 0)              snprintf(buf, sz, "!%s", l);
+    else if (strcmp(t, "BIT_AND") == 0)          snprintf(buf, sz, "%s & %s", l, r);
+    else if (strcmp(t, "BIT_OR") == 0)           snprintf(buf, sz, "%s | %s", l, r);
+    else if (strcmp(t, "BIT_XOR") == 0)          snprintf(buf, sz, "%s ^ %s", l, r);
+    else if (strcmp(t, "BIT_NOT") == 0)          snprintf(buf, sz, "~%s", l);
+    else if (strcmp(t, "SHIFT_LEFT") == 0)       snprintf(buf, sz, "%s << %s", l, r);
+    else if (strcmp(t, "SHIFT_RIGHT") == 0)      snprintf(buf, sz, "%s >> %s", l, r);
+    else if (strcmp(t, "CALL") == 0)             snprintf(buf, sz, "%s(...)", l);
+    else if (strcmp(t, "IF_COND") == 0)          snprintf(buf, sz, "if (%s)", l);
+    else if (strcmp(t, "LOOP_COND") == 0)        snprintf(buf, sz, "%s (%s)", v, l);
+    else if (strcmp(t, "REPEAT_COND") == 0)      snprintf(buf, sz, "do..%s (%s)", v, l);
+    else if (strcmp(t, "VAR_DECL") == 0)         snprintf(buf, sz, "var %s: %s", r, l);
+    else if (strcmp(t, "BREAK") == 0)            snprintf(buf, sz, "break");
+    else if (*v) snprintf(buf, sz, "%s", v);
+    else         buf[0] = '\0';
+}
 
-    char lbuf[256] = "", rbuf[256] = "";
-    if (op->left)  opToString(op->left,  lbuf, sizeof(lbuf));
-    if (op->right) opToString(op->right, rbuf, sizeof(rbuf));
+static void bbLabel(BasicBlock* bb, char* buf, int sz) {
+    buf[0] = '\0';
+    Operation* op = bb->operations;
+    while (op) {
+        char tmp[512] = "";
+        opStr(op, tmp, sizeof(tmp));
+        if (tmp[0] != '\0') {
+            if (buf[0] != '\0') strncat(buf, "\\n", sz - strlen(buf) - 1);
+            strncat(buf, tmp, sz - strlen(buf) - 1);
+        }
+        op = op->next;
+    }
+}
 
-    if (strcmp(t, "assignment") == 0)
-        snprintf(buf, buf_size, "%s = %s", lbuf, rbuf);
-    else if (strcmp(t, "SUM")   == 0) snprintf(buf, buf_size, "%s + %s",  lbuf, rbuf);
-    else if (strcmp(t, "MINUS") == 0 && op->right)
-        snprintf(buf, buf_size, "%s - %s", lbuf, rbuf);
-    else if (strcmp(t, "MINUS") == 0)
-        snprintf(buf, buf_size, "-%s", lbuf);
-    else if (strcmp(t, "MUL")   == 0) snprintf(buf, buf_size, "%s * %s",  lbuf, rbuf);
-    else if (strcmp(t, "SLASH") == 0) snprintf(buf, buf_size, "%s / %s",  lbuf, rbuf);
-    else if (strcmp(t, "PERCENT") == 0) snprintf(buf, buf_size, "%s %% %s", lbuf, rbuf);
-    else if (strcmp(t, "EQUALITY")    == 0) snprintf(buf, buf_size, "%s == %s", lbuf, rbuf);
-    else if (strcmp(t, "NOTEQUAL")    == 0) snprintf(buf, buf_size, "%s != %s", lbuf, rbuf);
-    else if (strcmp(t, "LESSTHAN")    == 0) snprintf(buf, buf_size, "%s < %s",  lbuf, rbuf);
-    else if (strcmp(t, "GREATERTHAN") == 0) snprintf(buf, buf_size, "%s > %s",  lbuf, rbuf);
-    else if (strcmp(t, "LESSTHANEQ")  == 0) snprintf(buf, buf_size, "%s <= %s", lbuf, rbuf);
-    else if (strcmp(t, "GREATERTHANEQ")==0) snprintf(buf, buf_size, "%s >= %s", lbuf, rbuf);
-    else if (strcmp(t, "AND") == 0)  snprintf(buf, buf_size, "%s && %s",  lbuf, rbuf);
-    else if (strcmp(t, "OR")  == 0)  snprintf(buf, buf_size, "%s || %s",  lbuf, rbuf);
-    else if (strcmp(t, "NOT") == 0)  snprintf(buf, buf_size, "!%s",       lbuf);
-    else if (strcmp(t, "BIT_AND")    == 0) snprintf(buf, buf_size, "%s & %s",  lbuf, rbuf);
-    else if (strcmp(t, "BIT_OR")     == 0) snprintf(buf, buf_size, "%s | %s",  lbuf, rbuf);
-    else if (strcmp(t, "BIT_XOR")    == 0) snprintf(buf, buf_size, "%s ^ %s",  lbuf, rbuf);
-    else if (strcmp(t, "BIT_NOT")    == 0) snprintf(buf, buf_size, "~%s",       lbuf);
-    else if (strcmp(t, "SHIFT_LEFT") == 0) snprintf(buf, buf_size, "%s << %s", lbuf, rbuf);
-    else if (strcmp(t, "SHIFT_RIGHT")== 0) snprintf(buf, buf_size, "%s >> %s", lbuf, rbuf);
-    else if (strcmp(t, "CALL")       == 0) snprintf(buf, buf_size, "%s(%s)",    lbuf, rbuf);
-    else if (strcmp(t, "IF_COND")    == 0) snprintf(buf, buf_size, "if (%s)",   lbuf);
-    else if (strcmp(t, "LOOP_COND")  == 0) snprintf(buf, buf_size, "%s (%s)", v, lbuf);
-    else if (strcmp(t, "REPEAT_COND")== 0) snprintf(buf, buf_size, "do..%s (%s)", v, lbuf);
-    else if (strcmp(t, "VAR_DECL")   == 0) snprintf(buf, buf_size, "var %s: %s", rbuf, lbuf);
-    else if (strcmp(t, "BREAK")      == 0) snprintf(buf, buf_size, "break");
-    else if (*v) snprintf(buf, buf_size, "%s(%s)", t, v);
-    else         snprintf(buf, buf_size, "%s", t);
+/* --- AST кластер --- */
+static int ast_cnt = 0;
+
+static int drawAstNode(FILE* f, Node* node) {
+    if (!node) return -1;
+    int id = ast_cnt++;
+    const char* lbl = (node->value && node->value[0]) ? node->value
+        : (node->type ? node->type : "?");
+    fprintf(f, "    ast%d [label=\"", id);
+    esc(f, lbl);
+    fprintf(f, "\", shape=none, fontsize=9, fontcolor=blue4];\n");
+    if (node->left) {
+        int c = drawAstNode(f, node->left);
+        if (c >= 0) fprintf(f, "    ast%d -> ast%d [color=gray80,arrowhead=none,penwidth=0.5];\n", id, c);
+    }
+    if (node->right) {
+        int c = drawAstNode(f, node->right);
+        if (c >= 0) fprintf(f, "    ast%d -> ast%d [color=gray80,arrowhead=none,penwidth=0.5];\n", id, c);
+    }
+    return id;
+}
+
+static void drawAstCluster(FILE* f, int bb_id, Node* ast) {
+    if (!ast) return;
+    fprintf(f, "  subgraph cluster_ast_%d {\n", bb_id);
+    fprintf(f, "    label=\"AST for BB%d\";\n", bb_id);
+    fprintf(f, "    style=dashed; color=gray70; fontcolor=gray50; fontsize=10;\n");
+    drawAstNode(f, ast);
+    fprintf(f, "  }\n");
 }
 
 /* ================================================================
- *  Экспорт CFG функции
+ *  Экспорт CFG
  * ================================================================ */
-
 void exportCFGToDot(Function* func, const char* filepath) {
     if (!func || !func->cfg) return;
 
-    FILE* f = fopen(filepath, "w");
-    if (!f) {
-        fprintf(stderr, "Cannot open file for writing: %s\n", filepath);
-        return;
+    /* Пропускаем вырожденные CFG: только ENTRY без содержательных блоков */
+    {
+        int meaningful = 0;
+        BasicBlock* bb = func->cfg->blocks;
+        while (bb) {
+            if (!bb->is_entry && !bb->is_exit && bb->operations)
+            {
+                meaningful = 1; break;
+            }
+            bb = bb->next;
+        }
+        if (!meaningful) return;
     }
 
-    const char* fname = (func->signature && func->signature->name)
-                        ? func->signature->name : "unknown";
+    FILE* f = fopen(filepath, "w");
+    if (!f) { fprintf(stderr, "Cannot open: %s\n", filepath); return; }
 
-    fprintf(f, "digraph CFG_%s {\n", fname);
-    fprintf(f, "  graph [label=\"CFG: %s\", fontsize=14, rankdir=TB];\n", fname);
-    fprintf(f, "  node  [shape=record, fontname=\"Courier\", fontsize=11];\n");
-    fprintf(f, "  edge  [fontname=\"Courier\", fontsize=10];\n\n");
+    ast_cnt = 0;
+    const char* fname = (func->signature && func->signature->name)
+        ? func->signature->name : "unknown";
+
+    fprintf(f, "digraph CFG {\n");
+    fprintf(f, "  node [fontname=\"Courier\", fontsize=11];\n");
+    fprintf(f, "  edge [fontname=\"Courier\", fontsize=10];\n\n");
 
     CFG* cfg = func->cfg;
-
-    /* Собираем все блоки в массив для упорядоченного вывода */
-    /* Блоки хранятся в обратном порядке добавления — обходим список */
-    /* Для красивого вывода нумеруем по id */
     BasicBlock* bb = cfg->blocks;
     while (bb) {
-        /* Метка блока */
-        fprintf(f, "  BB%d [", bb->id);
-
-        if (bb->is_entry)
-            fprintf(f, "style=filled, fillcolor=lightgreen, ");
-        else if (bb->is_exit)
-            fprintf(f, "style=filled, fillcolor=lightsalmon, ");
-        else
-            fprintf(f, "style=filled, fillcolor=lightyellow, ");
-
-        fprintf(f, "label=\"{BB%d", bb->id);
-        if (bb->is_entry) fprintf(f, " [ENTRY]");
-        if (bb->is_exit)  fprintf(f, " [EXIT]");
-
-        /* Операции */
-        Operation* op = bb->operations;
-        while (op) {
-            char buf[512] = "";
-            opToString(op, buf, sizeof(buf));
-            fprintf(f, " | ");
-            writeDotEscaped(f, buf);
-            /* В цепочке операции связаны через right если addOperationToBlock
-               не создал отдельную структуру. Но у нас addOperationToBlock
-               связывает через right. Поэтому идём по right. */
-            op = op->right;
+        if (bb->is_entry) {
+            fprintf(f, "  cfg_%d [label=\"ENTRY\", shape=circle, style=filled, fillcolor=palegreen];\n", bb->id);
+            bb = bb->next; continue;
+        }
+        if (bb->is_exit) {
+            fprintf(f, "  cfg_%d [label=\"EXIT\", shape=circle, style=filled, fillcolor=indianred1];\n", bb->id);
+            bb = bb->next; continue;
         }
 
-        fprintf(f, "}\"];\n");
+        const char* shape = "box";
+        if (bb->operations) {
+            const char* ot = bb->operations->op_type ? bb->operations->op_type : "";
+            if (strcmp(ot, "IF_COND") == 0 || strcmp(ot, "LOOP_COND") == 0 || strcmp(ot, "REPEAT_COND") == 0)
+                shape = "diamond";
+        }
+
+        char lbl[1024] = "";
+        bbLabel(bb, lbl, sizeof(lbl));
+
+        fprintf(f, "  cfg_%d [label=\"", bb->id);
+        if (lbl[0] != '\0') esc(f, lbl);
+        else fprintf(f, "BB%d", bb->id);
+        fprintf(f, "\", shape=%s, style=filled, fillcolor=white];\n", shape);
+
+        if (bb->ast_node)
+            drawAstCluster(f, bb->id, bb->ast_node);
+
         bb = bb->next;
     }
 
     fprintf(f, "\n");
 
-    /* Рёбра */
     bb = cfg->blocks;
     while (bb) {
         if (bb->true_target && bb->false_target) {
-            fprintf(f, "  BB%d -> BB%d [label=\"true\",  color=green];\n",
-                    bb->id, bb->true_target->id);
-            fprintf(f, "  BB%d -> BB%d [label=\"false\", color=red];\n",
-                    bb->id, bb->false_target->id);
-        } else if (bb->true_target) {
-            fprintf(f, "  BB%d -> BB%d;\n", bb->id, bb->true_target->id);
+            fprintf(f, "  cfg_%d -> cfg_%d [label=\"true\",  color=green];\n", bb->id, bb->true_target->id);
+            fprintf(f, "  cfg_%d -> cfg_%d [label=\"false\", color=red];\n", bb->id, bb->false_target->id);
+        }
+        else if (bb->true_target) {
+            fprintf(f, "  cfg_%d -> cfg_%d;\n", bb->id, bb->true_target->id);
         }
         bb = bb->next;
     }
 
+    fprintf(f, "\n  labelloc=\"b\";\n  label=\"CFG: %s\";\n  fontsize=12;\n", fname);
     fprintf(f, "}\n");
     fclose(f);
 }
@@ -170,85 +191,50 @@ void exportCFGToDot(Function* func, const char* filepath) {
 /* ================================================================
  *  Граф вызовов
  * ================================================================ */
-
-/* Сбор всех CALL-операций из дерева операций */
-static void collectCalls(Operation* op, char** calls, int* count, int max) {
+static void collectCalls(Operation* op, char** calls, int* cnt, int max) {
     if (!op) return;
-    if (op->op_type && strcmp(op->op_type, "CALL") == 0) {
-        /* Имя функции — левый потомок (IDENTIFIER) */
-        if (op->left && op->left->value && *count < max) {
-            calls[(*count)++] = op->left->value;
-        }
-    }
-    /* Не идём через right — там цепочка операций блока, не дерево */
-    collectCalls(op->left, calls, count, max);
-    /* right для дерева операций */
-    /* Осторожно: right в блоке — это следующая операция, не правый операнд!
-       В exprToOp мы создаём деревья (right = правый операнд).
-       В addOperationToBlock мы идём по right как по списку.
-       Эти два использования конфликтуют.
-       Для сбора вызовов идём только по структуре дерева операций,
-       не по цепочке блока. */
+    if (op->op_type && strcmp(op->op_type, "CALL") == 0)
+        if (op->left && op->left->value && *cnt < max)
+            calls[(*cnt)++] = op->left->value;
+    collectCalls(op->left, calls, cnt, max);
 }
 
-/* Сбор вызовов из всех блоков CFG */
-static void collectCallsFromCFG(CFG* cfg, char** calls, int* count, int max) {
+static void collectCallsFromCFG(CFG* cfg, char** calls, int* cnt, int max) {
     if (!cfg) return;
     BasicBlock* bb = cfg->blocks;
     while (bb) {
         Operation* op = bb->operations;
-        while (op) {
-            collectCalls(op, calls, count, max);
-            op = op->right; /* следующая операция в блоке */
-        }
+        while (op) { collectCalls(op, calls, cnt, max); op = op->next; }
         bb = bb->next;
     }
 }
 
 void exportCallGraphToDot(FunctionCollection* functions, const char* filepath) {
     if (!functions) return;
-
     FILE* f = fopen(filepath, "w");
-    if (!f) {
-        fprintf(stderr, "Cannot open file for writing: %s\n", filepath);
-        return;
-    }
+    if (!f) { fprintf(stderr, "Cannot open: %s\n", filepath); return; }
 
     fprintf(f, "digraph CallGraph {\n");
     fprintf(f, "  graph [label=\"Call Graph\", fontsize=14];\n");
-    fprintf(f, "  node  [shape=box, style=filled, fillcolor=lightblue,"
-               " fontname=\"Courier\"];\n\n");
+    fprintf(f, "  node  [shape=box, style=filled, fillcolor=lightblue, fontname=\"Courier\"];\n\n");
 
-    /* Вывести все известные функции как узлы */
     Function* func = functions->functions;
     while (func) {
-        if (func->signature && func->signature->name) {
+        if (func->signature && func->signature->name)
             fprintf(f, "  \"%s\";\n", func->signature->name);
-        }
         func = func->next;
     }
     fprintf(f, "\n");
 
-    /* Рёбра: caller -> callee */
     func = functions->functions;
     while (func) {
-        if (!func->signature || !func->signature->name) {
-            func = func->next;
-            continue;
-        }
-        const char* caller = func->signature->name;
-
-        char* calls[256];
-        int   call_count = 0;
-        collectCallsFromCFG(func->cfg, calls, &call_count, 256);
-
-        for (int i = 0; i < call_count; i++) {
-            fprintf(f, "  \"%s\" -> \"%s\";\n", caller, calls[i]);
-        }
-
+        if (!func->signature || !func->signature->name) { func = func->next; continue; }
+        char* calls[256]; int cc = 0;
+        collectCallsFromCFG(func->cfg, calls, &cc, 256);
+        for (int i = 0; i < cc; i++)
+            fprintf(f, "  \"%s\" -> \"%s\";\n", func->signature->name, calls[i]);
         func = func->next;
     }
-
     fprintf(f, "}\n");
     fclose(f);
 }

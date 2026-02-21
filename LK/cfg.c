@@ -8,17 +8,18 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* ===================== Operation ===================== */
+ /* ===================== Operation ===================== */
 
 Operation* createOperation(char* op_type, Operation* left, Operation* right,
-                           const char* value, int line_number) {
+    const char* value, int line_number) {
     Operation* op = (Operation*)malloc(sizeof(Operation));
     if (!op) return NULL;
-    op->op_type     = op_type ? strdup(op_type) : NULL;
-    op->left        = left;
-    op->right       = right;
-    op->value       = value ? strdup(value) : NULL;
+    op->op_type = op_type ? strdup(op_type) : NULL;
+    op->left = left;
+    op->right = right;
+    op->value = value ? strdup(value) : NULL;
     op->line_number = line_number;
+    op->next = NULL;
     return op;
 }
 
@@ -28,6 +29,7 @@ void freeOperation(Operation* op) {
     free(op->value);
     freeOperation(op->left);
     freeOperation(op->right);
+    freeOperation(op->next);
     free(op);
 }
 
@@ -36,26 +38,28 @@ void freeOperation(Operation* op) {
 BasicBlock* createBasicBlock(int id) {
     BasicBlock* bb = (BasicBlock*)malloc(sizeof(BasicBlock));
     if (!bb) return NULL;
-    bb->id           = id;
-    bb->operations   = NULL;
-    bb->true_target  = NULL;
+    bb->id = id;
+    bb->operations = NULL;
+    bb->true_target = NULL;
     bb->false_target = NULL;
-    bb->next         = NULL;
-    bb->is_entry     = 0;
-    bb->is_exit      = 0;
+    bb->next = NULL;
+    bb->is_entry = 0;
+    bb->is_exit = 0;
+    bb->ast_node = NULL;
     return bb;
 }
 
-/* Присоединить операцию к блоку (список через right-указатель) */
+/* Присоединить операцию к блоку (список через next-указатель) */
 void addOperationToBlock(BasicBlock* block, Operation* op) {
     if (!block || !op) return;
     if (!block->operations) {
         block->operations = op;
-    } else {
-        /* идём до конца цепочки по right */
+    }
+    else {
+        /* идём до конца цепочки по next */
         Operation* cur = block->operations;
-        while (cur->right) cur = cur->right;
-        cur->right = op;
+        while (cur->next) cur = cur->next;
+        cur->next = op;
     }
 }
 
@@ -71,16 +75,16 @@ CFG* createCFG(void) {
     CFG* cfg = (CFG*)malloc(sizeof(CFG));
     if (!cfg) return NULL;
     cfg->entry_block = NULL;
-    cfg->exit_block  = NULL;
-    cfg->blocks      = NULL;
+    cfg->exit_block = NULL;
+    cfg->blocks = NULL;
     cfg->block_count = 0;
     return cfg;
 }
 
 void addBlockToCFG(CFG* cfg, BasicBlock* block) {
     if (!cfg || !block) return;
-    block->next  = cfg->blocks;
-    cfg->blocks  = block;
+    block->next = cfg->blocks;
+    cfg->blocks = block;
     cfg->block_count++;
 }
 
@@ -98,13 +102,13 @@ void freeCFG(CFG* cfg) {
 /* ===================== Function ===================== */
 
 Function* createFunction(FunctionSignature* signature, CFG* cfg,
-                         const char* source_file) {
+    const char* source_file) {
     Function* f = (Function*)malloc(sizeof(Function));
     if (!f) return NULL;
-    f->signature   = signature;
-    f->cfg         = cfg;
+    f->signature = signature;
+    f->cfg = cfg;
     f->source_file = source_file ? strdup(source_file) : NULL;
-    f->next        = NULL;
+    f->next = NULL;
     return f;
 }
 
@@ -133,19 +137,19 @@ void freeFunction(Function* func) {
 FileCollection* createFileCollection(void) {
     FileCollection* fc = (FileCollection*)malloc(sizeof(FileCollection));
     if (!fc) return NULL;
-    fc->files      = NULL;
+    fc->files = NULL;
     fc->file_count = 0;
     return fc;
 }
 
 void addFileToCollection(FileCollection* collection, const char* filename,
-                         Node* ast) {
+    Node* ast) {
     if (!collection) return;
     FileInfo* fi = (FileInfo*)malloc(sizeof(FileInfo));
     if (!fi) return;
     fi->filename = filename ? strdup(filename) : NULL;
-    fi->ast      = ast;
-    fi->next     = collection->files;
+    fi->ast = ast;
+    fi->next = collection->files;
     collection->files = fi;
     collection->file_count++;
 }
@@ -153,14 +157,14 @@ void addFileToCollection(FileCollection* collection, const char* filename,
 FunctionCollection* createFunctionCollection(void) {
     FunctionCollection* fc = (FunctionCollection*)malloc(sizeof(FunctionCollection));
     if (!fc) return NULL;
-    fc->functions      = NULL;
+    fc->functions = NULL;
     fc->function_count = 0;
     return fc;
 }
 
 void addFunctionToCollection(FunctionCollection* collection, Function* func) {
     if (!collection || !func) return;
-    func->next           = collection->functions;
+    func->next = collection->functions;
     collection->functions = func;
     collection->function_count++;
 }
@@ -168,30 +172,30 @@ void addFunctionToCollection(FunctionCollection* collection, Function* func) {
 ErrorCollection* createErrorCollection(void) {
     ErrorCollection* ec = (ErrorCollection*)malloc(sizeof(ErrorCollection));
     if (!ec) return NULL;
-    ec->errors      = NULL;
+    ec->errors = NULL;
     ec->error_count = 0;
     return ec;
 }
 
 void addErrorToCollection(ErrorCollection* collection, const char* message,
-                          const char* filename, int line_number) {
+    const char* filename, int line_number) {
     if (!collection) return;
     Error* e = (Error*)malloc(sizeof(Error));
     if (!e) return;
-    e->message     = message  ? strdup(message)  : NULL;
-    e->filename    = filename ? strdup(filename) : NULL;
+    e->message = message ? strdup(message) : NULL;
+    e->filename = filename ? strdup(filename) : NULL;
     e->line_number = line_number;
-    e->next        = collection->errors;
+    e->next = collection->errors;
     collection->errors = e;
     collection->error_count++;
 }
 
 AnalysisResult* createAnalysisResult(FunctionCollection* functions,
-                                     ErrorCollection* errors) {
+    ErrorCollection* errors) {
     AnalysisResult* ar = (AnalysisResult*)malloc(sizeof(AnalysisResult));
     if (!ar) return NULL;
     ar->functions = functions;
-    ar->errors    = errors;
+    ar->errors = errors;
     return ar;
 }
 
@@ -225,12 +229,12 @@ void freeAnalysisResult(AnalysisResult* result) {
  * ============================================================ */
 
 typedef struct BuildCtx {
-    CFG*             cfg;
+    CFG* cfg;
     ErrorCollection* errors;
-    const char*      filename;
+    const char* filename;
     int              block_id_counter;
     /* стек блоков-продолжений для break */
-    BasicBlock*      break_targets[64];
+    BasicBlock* break_targets[64];
     int              break_depth;
 } BuildCtx;
 
@@ -249,18 +253,18 @@ static Operation* exprToOp(Node* node) {
 
     /* Листья: литералы, идентификаторы */
     if (strcmp(t, "IDENTIFIER") == 0 ||
-        strcmp(t, "DEC")        == 0 ||
-        strcmp(t, "HEX")        == 0 ||
-        strcmp(t, "BIN")        == 0 ||
-        strcmp(t, "STR")        == 0 ||
-        strcmp(t, "CHAR")       == 0 ||
-        strcmp(t, "TRUE")       == 0 ||
-        strcmp(t, "FALSE")      == 0) {
+        strcmp(t, "DEC") == 0 ||
+        strcmp(t, "HEX") == 0 ||
+        strcmp(t, "BIN") == 0 ||
+        strcmp(t, "STR") == 0 ||
+        strcmp(t, "CHAR") == 0 ||
+        strcmp(t, "TRUE") == 0 ||
+        strcmp(t, "FALSE") == 0) {
         return createOperation((char*)t, NULL, NULL, v, 0);
     }
 
     /* Бинарные/унарные операции */
-    Operation* left  = exprToOp(node->left);
+    Operation* left = exprToOp(node->left);
     Operation* right = exprToOp(node->right);
 
     /* Для именованных операций (SUM, MINUS, MUL, ...) */
@@ -277,10 +281,10 @@ static Operation* exprToOp(Node* node) {
  * after_block — блок, который следует после всей конструкции (для break)
  */
 static BasicBlock* buildBlock(BuildCtx* ctx, Node* node,
-                               BasicBlock* current, BasicBlock* after_block);
+    BasicBlock* current, BasicBlock* after_block);
 
 static BasicBlock* buildList(BuildCtx* ctx, Node* node,
-                              BasicBlock* current, BasicBlock* after_block) {
+    BasicBlock* current, BasicBlock* after_block) {
     if (!node) return current;
     /* listStatement / listSourceItem — левый потомок = statement, правый = tail */
     if (strcmp(node->type ? node->type : "", "listStatement") == 0 ||
@@ -293,7 +297,7 @@ static BasicBlock* buildList(BuildCtx* ctx, Node* node,
 }
 
 static BasicBlock* buildBlock(BuildCtx* ctx, Node* node,
-                               BasicBlock* current, BasicBlock* after_block) {
+    BasicBlock* current, BasicBlock* after_block) {
     if (!node || !current) return current;
 
     const char* t = node->type ? node->type : "";
@@ -306,31 +310,35 @@ static BasicBlock* buildBlock(BuildCtx* ctx, Node* node,
     /* ---- var declaration ---- */
     if (strcmp(t, "var") == 0) {
         Operation* op = createOperation("VAR_DECL", exprToOp(node->left),
-                                        exprToOp(node->right), NULL, 0);
+            exprToOp(node->right), NULL, 0);
         addOperationToBlock(current, op);
+        if (!current->ast_node) current->ast_node = node;
         return current;
     }
 
     /* ---- assignment / expression ---- */
     if (strcmp(t, "assignment") == 0 ||
-        strcmp(t, "SUM")        == 0 || strcmp(t, "MINUS")       == 0 ||
-        strcmp(t, "MUL")        == 0 || strcmp(t, "SLASH")        == 0 ||
-        strcmp(t, "PERCENT")    == 0 || strcmp(t, "EQUALITY")     == 0 ||
-        strcmp(t, "NOTEQUAL")   == 0 || strcmp(t, "LESSTHAN")     == 0 ||
-        strcmp(t, "GREATERTHAN")== 0 || strcmp(t, "LESSTHANEQ")   == 0 ||
-        strcmp(t, "GREATERTHANEQ")==0 || strcmp(t, "AND")         == 0 ||
-        strcmp(t, "OR")         == 0 || strcmp(t, "BIT_AND")      == 0 ||
-        strcmp(t, "BIT_OR")     == 0 || strcmp(t, "BIT_XOR")      == 0 ||
-        strcmp(t, "SHIFT_LEFT") == 0 || strcmp(t, "SHIFT_RIGHT")  == 0 ||
-        strcmp(t, "NOT")        == 0 || strcmp(t, "BIT_NOT")      == 0 ||
-        strcmp(t, "PLUS")       == 0 || strcmp(t, "CALL")         == 0 ||
-        strcmp(t, "braces")     == 0 || strcmp(t, "slice")        == 0 ||
-        strcmp(t, "IDENTIFIER") == 0 || strcmp(t, "DEC")          == 0 ||
-        strcmp(t, "HEX")        == 0 || strcmp(t, "BIN")          == 0 ||
-        strcmp(t, "STR")        == 0 || strcmp(t, "CHAR")         == 0 ||
-        strcmp(t, "TRUE")       == 0 || strcmp(t, "FALSE")        == 0) {
+        strcmp(t, "SUM") == 0 || strcmp(t, "MINUS") == 0 ||
+        strcmp(t, "MUL") == 0 || strcmp(t, "SLASH") == 0 ||
+        strcmp(t, "PERCENT") == 0 || strcmp(t, "EQUALITY") == 0 ||
+        strcmp(t, "NOTEQUAL") == 0 || strcmp(t, "LESSTHAN") == 0 ||
+        strcmp(t, "GREATERTHAN") == 0 || strcmp(t, "LESSTHANEQ") == 0 ||
+        strcmp(t, "GREATERTHANEQ") == 0 || strcmp(t, "AND") == 0 ||
+        strcmp(t, "OR") == 0 || strcmp(t, "BIT_AND") == 0 ||
+        strcmp(t, "BIT_OR") == 0 || strcmp(t, "BIT_XOR") == 0 ||
+        strcmp(t, "SHIFT_LEFT") == 0 || strcmp(t, "SHIFT_RIGHT") == 0 ||
+        strcmp(t, "NOT") == 0 || strcmp(t, "BIT_NOT") == 0 ||
+        strcmp(t, "PLUS") == 0 || strcmp(t, "CALL") == 0 ||
+        strcmp(t, "braces") == 0 || strcmp(t, "slice") == 0 ||
+        strcmp(t, "IDENTIFIER") == 0 || strcmp(t, "DEC") == 0 ||
+        strcmp(t, "HEX") == 0 || strcmp(t, "BIN") == 0 ||
+        strcmp(t, "STR") == 0 || strcmp(t, "CHAR") == 0 ||
+        strcmp(t, "TRUE") == 0 || strcmp(t, "FALSE") == 0) {
         Operation* op = exprToOp(node);
-        if (op) addOperationToBlock(current, op);
+        if (op) {
+            addOperationToBlock(current, op);
+            if (!current->ast_node) current->ast_node = node;
+        }
         return current;
     }
 
@@ -353,10 +361,10 @@ static BasicBlock* buildBlock(BuildCtx* ctx, Node* node,
         Operation* cond_op = exprToOp(node->left);
         addOperationToBlock(current, createOperation("IF_COND", cond_op, NULL, NULL, 0));
 
-        BasicBlock* then_block  = newBlock(ctx);
+        BasicBlock* then_block = newBlock(ctx);
         BasicBlock* merge_block = newBlock(ctx);
 
-        current->true_target  = then_block;
+        current->true_target = then_block;
         current->false_target = merge_block;
 
         /* then */
@@ -369,28 +377,29 @@ static BasicBlock* buildBlock(BuildCtx* ctx, Node* node,
          * else сохраняется отдельно — в parser.y: $$->right = $4 (optionalElse)
          * $4 имеет тип "else". Разберём отдельно.
          */
-        /* На самом деле в parser.y:
-         *   $$ = createNode("if", $2, $3, NULL);  // left=cond, right=then
-         *   if ($4) $$->right = $4;               // right перезаписывается на else!
-         * Значит если есть else, node->right = else-node, а then потерян?
-         * Это баг парсера, но работаем с тем что есть.
-         * Если node->right->type == "else", то then = NULL (потерян), else = node->right->left
-         * Иначе then = node->right.
-         */
-        /* Переделаем: */
+         /* На самом деле в parser.y:
+          *   $$ = createNode("if", $2, $3, NULL);  // left=cond, right=then
+          *   if ($4) $$->right = $4;               // right перезаписывается на else!
+          * Значит если есть else, node->right = else-node, а then потерян?
+          * Это баг парсера, но работаем с тем что есть.
+          * Если node->right->type == "else", то then = NULL (потерян), else = node->right->left
+          * Иначе then = node->right.
+          */
+          /* Переделаем: */
         then_end = then_block; /* сброс */
         if (node->right && node->right->type &&
             strcmp(node->right->type, "else") == 0) {
             /* then потерян — только else */
             BasicBlock* else_block = newBlock(ctx);
-            current->false_target  = else_block;
+            current->false_target = else_block;
             /* then_block остаётся пустым, ведёт в merge */
             then_block->true_target = merge_block;
 
             BasicBlock* else_end = buildBlock(ctx, node->right->left,
-                                              else_block, after_block);
+                else_block, after_block);
             if (else_end) else_end->true_target = merge_block;
-        } else {
+        }
+        else {
             /* Нет else */
             BasicBlock* tend = buildBlock(ctx, node->right, then_block, after_block);
             if (tend) tend->true_target = merge_block;
@@ -406,19 +415,19 @@ static BasicBlock* buildBlock(BuildCtx* ctx, Node* node,
          * node->right = body (listStatement)
          * node->value = "while" | "until"
          */
-        BasicBlock* cond_block  = newBlock(ctx);
-        BasicBlock* body_block  = newBlock(ctx);
-        BasicBlock* exit_block  = newBlock(ctx);
+        BasicBlock* cond_block = newBlock(ctx);
+        BasicBlock* body_block = newBlock(ctx);
+        BasicBlock* exit_block = newBlock(ctx);
 
         current->true_target = cond_block;
 
         Operation* cond_op = exprToOp(node->left);
         addOperationToBlock(cond_block,
             createOperation("LOOP_COND", cond_op, NULL,
-                            node->value ? node->value : "while", 0));
+                node->value ? node->value : "while", 0));
 
         /* while: вход в тело если условие истинно */
-        cond_block->true_target  = body_block;
+        cond_block->true_target = body_block;
         cond_block->false_target = exit_block;
 
         /* break внутри тела выходит в exit_block */
@@ -457,8 +466,8 @@ static BasicBlock* buildBlock(BuildCtx* ctx, Node* node,
         Operation* cond_op = exprToOp(node->right);
         addOperationToBlock(cond_block,
             createOperation("REPEAT_COND", cond_op, NULL,
-                            node->value ? node->value : "while", 0));
-        cond_block->true_target  = body_block; /* ещё раз */
+                node->value ? node->value : "while", 0));
+        cond_block->true_target = body_block; /* ещё раз */
         cond_block->false_target = exit_block;
 
         return exit_block;
@@ -469,7 +478,8 @@ static BasicBlock* buildBlock(BuildCtx* ctx, Node* node,
         addOperationToBlock(current, createOperation("BREAK", NULL, NULL, NULL, 0));
         if (ctx->break_depth > 0) {
             current->true_target = ctx->break_targets[ctx->break_depth - 1];
-        } else {
+        }
+        else {
             addErrorToCollection(ctx->errors,
                 "break outside of loop", ctx->filename, 0);
         }
@@ -489,8 +499,8 @@ static BasicBlock* buildBlock(BuildCtx* ctx, Node* node,
         snprintf(label, sizeof(label), "<%s>", t);
         addOperationToBlock(current,
             createOperation(label, exprToOp(node->left),
-                            exprToOp(node->right),
-                            node->value, 0));
+                exprToOp(node->right),
+                node->value, 0));
     }
     return current;
 }
@@ -499,11 +509,11 @@ static BasicBlock* buildBlock(BuildCtx* ctx, Node* node,
  *  Построение CFG одной функции из sourceItem
  * ============================================================ */
 static Function* buildFunctionCFG(Node* sourceItem, const char* filename,
-                                   ErrorCollection* errors) {
+    ErrorCollection* errors) {
     if (!sourceItem) return NULL;
 
     /* sourceItem: left = funcSignature, right = listStatement */
-    Node* sig_node  = sourceItem->left;
+    Node* sig_node = sourceItem->left;
     Node* body_node = sourceItem->right;
 
     if (!sig_node) {
@@ -516,8 +526,8 @@ static Function* buildFunctionCFG(Node* sourceItem, const char* filename,
 
     /* Сигнатура */
     FunctionSignature* sig = (FunctionSignature*)malloc(sizeof(FunctionSignature));
-    sig->name        = strdup(func_name);
-    sig->args        = NULL;
+    sig->name = strdup(func_name);
+    sig->args = NULL;
     sig->return_type = NULL;
 
     /* Тип возврата — sig_node->right (optionalTypeRef) */
@@ -532,23 +542,25 @@ static Function* buildFunctionCFG(Node* sourceItem, const char* filename,
     while (arg_list) {
         Node* arg_node = NULL;
         if (arg_list->type && strcmp(arg_list->type, "listArgDef") == 0) {
-            arg_node  = arg_list->left;
-            arg_list  = arg_list->right;
-        } else if (arg_list->type && strcmp(arg_list->type, "argDef") == 0) {
+            arg_node = arg_list->left;
+            arg_list = arg_list->right;
+        }
+        else if (arg_list->type && strcmp(arg_list->type, "argDef") == 0) {
             arg_node = arg_list;
             arg_list = NULL;
-        } else {
+        }
+        else {
             break;
         }
         if (!arg_node) break;
 
         FunctionArg* fa = (FunctionArg*)malloc(sizeof(FunctionArg));
         fa->name = (arg_node->left && arg_node->left->value)
-                   ? strdup(arg_node->left->value) : strdup("?");
+            ? strdup(arg_node->left->value) : strdup("?");
         fa->type = (arg_node->right && arg_node->right->value)
-                   ? strdup(arg_node->right->value)
-                   : (arg_node->right && arg_node->right->type)
-                     ? strdup(arg_node->right->type) : strdup("?");
+            ? strdup(arg_node->right->value)
+            : (arg_node->right && arg_node->right->type)
+            ? strdup(arg_node->right->type) : strdup("?");
         fa->next = NULL;
 
         if (!sig->args) sig->args = fa;
@@ -560,21 +572,30 @@ static Function* buildFunctionCFG(Node* sourceItem, const char* filename,
     CFG* cfg = createCFG();
 
     BuildCtx ctx;
-    ctx.cfg              = cfg;
-    ctx.errors           = errors;
-    ctx.filename         = filename;
+    ctx.cfg = cfg;
+    ctx.errors = errors;
+    ctx.filename = filename;
     ctx.block_id_counter = 0;
-    ctx.break_depth      = 0;
+    ctx.break_depth = 0;
 
     BasicBlock* entry = newBlock(&ctx);
-    entry->is_entry   = 1;
-    cfg->entry_block  = entry;
+    entry->is_entry = 1;
+    cfg->entry_block = entry;
 
-    BasicBlock* last  = buildBlock(&ctx, body_node, entry, NULL);
+    BasicBlock* last = buildBlock(&ctx, body_node, entry, NULL);
 
-    if (last) {
-        last->is_exit   = 1;
-        cfg->exit_block = last;
+    /* Всегда создаём отдельный EXIT-блок, чтобы ENTRY не совпадал с EXIT */
+    BasicBlock* exit_block = newBlock(&ctx);
+    exit_block->is_exit = 1;
+    cfg->exit_block = exit_block;
+
+    if (last && last != entry) {
+        if (!last->true_target)
+            last->true_target = exit_block;
+    }
+    else {
+        if (!entry->true_target)
+            entry->true_target = exit_block;
     }
 
     Function* func = createFunction(sig, cfg, filename);
@@ -589,9 +610,10 @@ static Function* buildFunctionCFG(Node* sourceItem, const char* filename,
 static void collectSourceItems(Node* node, Node** items, int* count, int max) {
     if (!node) return;
     if (node->type && strcmp(node->type, "source") == 0) {
-        collectSourceItems(node->left,  items, count, max);
+        collectSourceItems(node->left, items, count, max);
         collectSourceItems(node->right, items, count, max);
-    } else if (node->type && strcmp(node->type, "sourceItem") == 0) {
+    }
+    else if (node->type && strcmp(node->type, "sourceItem") == 0) {
         if (*count < max) items[(*count)++] = node;
     }
 }
@@ -600,8 +622,8 @@ static void collectSourceItems(Node* node, Node** items, int* count, int max) {
  *  Главный интерфейс: buildCFGFromAST
  * ============================================================ */
 AnalysisResult* buildCFGFromAST(FileCollection* file_collection) {
-    FunctionCollection* funcs  = createFunctionCollection();
-    ErrorCollection*    errors = createErrorCollection();
+    FunctionCollection* funcs = createFunctionCollection();
+    ErrorCollection* errors = createErrorCollection();
 
     if (!file_collection) {
         addErrorToCollection(errors, "Null file collection", NULL, 0);
@@ -613,7 +635,7 @@ AnalysisResult* buildCFGFromAST(FileCollection* file_collection) {
         Node* root = fi->ast;
         if (!root) {
             addErrorToCollection(errors, "Null AST for file",
-                                 fi->filename, 0);
+                fi->filename, 0);
             fi = fi->next;
             continue;
         }

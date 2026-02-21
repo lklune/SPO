@@ -1,0 +1,211 @@
+// ============================================================
+// test_full.txt — тестовый файл, покрывающий все конструкции языка
+// ============================================================
+
+// --- 1. Функция с аргументами, возвратом и объявлениями переменных ---
+def add(a (of int), b (of int)) (of int)
+    int result;
+    result = a + b;
+end
+
+// --- 2. Все типы данных и литералы ---
+def literals_demo()
+    int   dec_val;
+    int   hex_val;
+    int   bin_val;
+    bool  flag1;
+    bool  flag2;
+    char  ch;
+    string msg;
+
+    dec_val = 42;
+    hex_val = 0xFF;
+    bin_val = 0b1010;
+    flag1 = true;
+    flag2 = false;
+    ch = 'z';
+    msg = "hello world";
+end
+
+// --- 3. Все бинарные операции ---
+def binary_ops()
+    int a;
+    int b;
+    int r;
+
+    r = a + b;
+    r = a - b;
+    r = a * b;
+    r = a / b;
+    r = a % b;
+    r = a & b;
+    r = a | b;
+    r = a ^ b;
+    r = a << b;
+    r = a >> b;
+    bool eq;
+    eq = a == b;
+    eq = a != b;
+    eq = a < b;
+    eq = a > b;
+    eq = a <= b;
+    eq = a >= b;
+    eq = eq && flag;
+    eq = eq || flag;
+end
+
+// --- 4. Унарные операции ---
+def unary_ops()
+    int  x;
+    bool b;
+    int  y;
+
+    y = -x;
+    y = +x;
+    b = !b;
+    y = ~x;
+end
+
+// --- 5. Приоритет операций и скобки ---
+def precedence_demo()
+    int a;
+    int b;
+    int c;
+    int r;
+
+    r = a + b * c;
+    r = (a + b) * c;
+    r = a * b + c * a;
+    r = (a + (b * (c - a)));
+end
+
+// --- 6. Объявление массива и срез ---
+def array_demo()
+    int array[10] arr;
+    int val;
+
+    val = arr[0];
+    arr[3] = val + 1;
+    arr[1..5];
+    arr[0..3, 7..9];
+end
+
+// --- 7. Если-иначе (все формы) ---
+def if_demo()
+    int x;
+
+    if x > 0 than
+        x = 1;
+
+    if x == 0 than
+        x = 99;
+    else
+        x = -1;
+
+    if x < 0 than
+        x = 0;
+    else if x > 100 than
+        x = 100;
+    else
+        x = x;
+end
+
+// --- 8. Циклы while и until ---
+def loop_demo()
+    int i;
+    i = 0;
+
+    while i < 10
+        i = i + 1;
+    end
+
+    until i == 0
+        i = i - 1;
+    end
+end
+
+// --- 9. Циклы do-while и do-until (repeat) ---
+def repeat_demo()
+    int i;
+    i = 0;
+
+    {
+        i = i + 1;
+    } while i < 5;
+
+    begin
+        i = i - 1;
+    end until i == 0;
+end
+
+// --- 10. break внутри цикла ---
+def break_demo()
+    int i;
+    i = 0;
+
+    while i < 100
+        if i == 42 than
+            break;
+        i = i + 1;
+    end
+end
+
+// --- 11. Вызов функций (включая граф вызовов) ---
+def caller_demo()
+    int a;
+    int b;
+    int s;
+
+    a = 3;
+    b = 4;
+    s = add(a, b);
+    literals_demo();
+    binary_ops();
+    s = add(add(1, 2), add(3, 4));
+end
+
+// --- 12. Блоки begin/end и { } ---
+def blocks_demo()
+    int x;
+    x = 1;
+
+    begin
+        x = x + 1;
+    end
+
+    {
+        x = x * 2;
+    }
+end
+
+// --- 13. Многократное объявление и инициализация переменных ---
+def multi_var()
+    int a, b, c;
+    int x = 10, y = 20;
+    bool flag = true;
+end
+
+// --- 14. Вложенные циклы с break ---
+def nested_loops()
+    int i;
+    int j;
+    i = 0;
+
+    while i < 5
+        j = 0;
+        while j < 5
+            if i == j than
+                break;
+            j = j + 1;
+        end
+        i = i + 1;
+    end
+end
+
+// --- 15. Функция типа main: точка входа для графа вызовов ---
+def main()
+    caller_demo();
+    loop_demo();
+    break_demo();
+    nested_loops();
+end

@@ -1,0 +1,21 @@
+// main.txt — точка входа
+def main()
+    caller_demo();
+    loop_demo();
+    break_demo();
+    nested_loops();
+//    if_demo();
+//    unary_ops();
+end
+
+def caller_demo()
+    int a;
+    int b;
+    int s;
+    a = 3;
+    b = 4;
+    s = add(a, b);
+    literals_demo();
+    binary_ops();
+    s = add(add(1, 2), add(3, 4));
+end

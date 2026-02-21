@@ -1,0 +1,65 @@
+// control.txt — управляющие конструкции
+def if_demo()
+    int x;
+    if x > 0 than
+        x = 1;
+    if x == 0 than
+        x = 99;
+    else
+        x = -1;
+    if x < 0 than
+        x = 0;
+    else if x > 100 than
+        x = 100;
+    else
+        x = x;
+end
+
+def loop_demo()
+    int i;
+    i = 0;
+    while i < 10
+        i = i + 1;
+    end
+    until i == 0
+        i = i - 1;
+    end
+end
+
+def break_demo()
+    int i;
+    i = 0;
+    while i < 100
+        if i == 42 than
+            break;
+        i = i + 1;
+    end
+end
+
+def nested_loops()
+    int i;
+    int j;
+    i = 0;
+    while i < 5
+        j = 0;
+        while j < 5
+            if i == j than
+                break;
+            j = j + 1;
+        end
+        i = i + 1;
+    end
+end
+
+def literals_demo()
+    int   dec_val;
+    int   hex_val;
+    int   bin_val;
+    bool  flag1;
+    bool  flag2;
+    dec_val = 42;
+    hex_val = 0xFF;
+    bin_val = 0b1010;
+    flag1 = true;
+    flag2 = false;
+end

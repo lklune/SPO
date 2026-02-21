@@ -158,7 +158,7 @@
 "!"                                 {
  return NOT;
  }
-"\|\|"                              {
+"||"                              {
  return OR;
  }
 "&&"                                {
@@ -188,7 +188,7 @@
  yylval.node = createNode("BIT_AND", NULL, NULL, "");
  return BIT_AND;
  }
-"\|"                                {
+"|"                                {
  yylval.node = createNode("BIT_OR", NULL, NULL, "");
  return BIT_OR;
  }
@@ -208,6 +208,9 @@
  }
 "*"                                 {
  return STAR;
+ }
+"/"                                 {
+ return SLASH;
  }
 "("                                 {
  return LPAREN;

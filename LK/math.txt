@@ -1,0 +1,31 @@
+// math.txt — математические операции
+def add(a (of int), b (of int)) (of int)
+    int result;
+    result = a + b;
+end
+
+def binary_ops()
+    int a;
+    int b;
+    int r;
+    bool eq;
+    r = a + b;
+    r = a - b;
+    r = a * b;
+    r = a / b;
+    r = a % b;
+    eq = a == b;
+    eq = a != b;
+    eq = a < b;
+    eq = a > b;
+end
+
+def unary_ops()
+    int  x;
+    bool b;
+    int  y;
+    y = -x;
+    y = +x;
+    b = !b;
+    y = ~x;
+end

@@ -1,25 +1,40 @@
-.PHONY: run clean all
+CC     = gcc
+CFLAGS = -O0 -g
+SRC_DIR = .
+OUT_DIR = pictures
 
-CC = gcc
-CFLAGS = -c
+SRC = $(SRC_DIR)/main.c \
+      $(SRC_DIR)/node.c \
+      $(SRC_DIR)/error.c \
+      $(SRC_DIR)/cfg.c \
+      $(SRC_DIR)/export_ast.c \
+      $(SRC_DIR)/export_cfg.c \
+      $(SRC_DIR)/parser.tab.c \
+      $(SRC_DIR)/lex.yy.c
 
-SOURCES = main.c error.c node.c parser.tab.c lex.yy.c export_ast.c cfg.c export_cfg.c
-OBJECTS = $(SOURCES:.c=.o)
-EXECUTABLE = printer
+OBJ     = $(SRC:.c=.o)
+BIN = printer
 
-# Targets
+build: $(BIN)
 
-all: $(EXECUTABLE)
-
-$(EXECUTABLE): $(OBJECTS)
-	$(CC) $(LDFLAGS) $(OBJECTS) -o $@
+$(BIN): $(OBJ)
+	$(CC) $(CFLAGS) -o $(BIN) $^
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-run: $(EXECUTABLE)
-	chmod +x $(EXECUTABLE)
-	./$(EXECUTABLE) input.txt
+run: build
+	./$(BIN) main.txt math.txt control.txt
+#	./$(BIN) input.txt
 
 clean:
-	rm -rf *.o $(EXECUTABLE) *.dot *.json
+	rm -f $(BIN) $(SRC_DIR)/*.o \
+	      $(SRC_DIR)/*.dot $(SRC_DIR)/*.json \
+	      $(OUT_DIR)/*.png
+
+cleanout:
+	rm -f $(SRC_DIR)/*.o $(SRC_DIR)/*.dot $(SRC_DIR)/*.json
+
+rebuild: clean build
+
+.PHONY: build run clean rebuild cleanout png

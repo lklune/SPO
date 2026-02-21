@@ -17,6 +17,7 @@ struct Operation {
     Operation* right;
     char* value;
     int line_number;
+    Operation* next;
 };
 
 typedef struct BasicBlock BasicBlock;
@@ -28,6 +29,7 @@ struct BasicBlock {
     BasicBlock* next;
     int is_entry;
     int is_exit;
+    Node* ast_node;
 };
 
 typedef struct CFG CFG;
