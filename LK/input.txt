@@ -3,13 +3,13 @@ def test_func() (of bool)
     test = true;
     bool array[5] arr;
 
-    slice[1..2, 4..6];
-    //comment
+    arr[1..2, 4..6];
 
     x = a + b * c + d;
+    z = a * b + c * d;
 
     begin
-        while test = true
+        while test == true
             a = a +  b;
         end
     end

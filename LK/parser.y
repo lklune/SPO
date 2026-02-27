@@ -35,6 +35,18 @@ void yyerror(const char *s);  // прототип функции обработки ошибок
 %token <node> TYPEDEF
 %token <node> ARRAY_COMMAS
 
+%right ASSIGN
+%left OR
+%left AND
+%left EQUAL NOTEQUAL
+%left LESSTHAN GREATERTHAN LESSTHANEQ GREATERTHANEQ
+%left BIT_OR
+%left BIT_XOR
+%left BIT_AND
+%left SHIFT_LEFT SHIFT_RIGHT
+%left PLUS MINUS
+%left STAR SLASH PERCENT
+%right BIT_NOT NOT
 
 %type <node> typeRef
 %type <node> funcSignature
