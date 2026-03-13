@@ -104,7 +104,14 @@ extern int yydebug;
     LBRACKET = 299,                /* LBRACKET  */
     RBRACKET = 300,                /* RBRACKET  */
     TYPEDEF = 301,                 /* TYPEDEF  */
-    ARRAY_COMMAS = 302             /* ARRAY_COMMAS  */
+    ARRAY_COMMAS = 302,            /* ARRAY_COMMAS  */
+    ASSIGN = 303,                  /* ASSIGN  */
+    BIT_OR = 304,                  /* BIT_OR  */
+    BIT_XOR = 305,                 /* BIT_XOR  */
+    BIT_AND = 306,                 /* BIT_AND  */
+    SHIFT_LEFT = 307,              /* SHIFT_LEFT  */
+    SHIFT_RIGHT = 308,             /* SHIFT_RIGHT  */
+    BIT_NOT = 309                  /* BIT_NOT  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -117,7 +124,7 @@ union YYSTYPE
 
     Node* node;
 
-#line 121 "parser.tab.h"
+#line 128 "parser.tab.h"
 
 };
 typedef union YYSTYPE YYSTYPE;
