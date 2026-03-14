@@ -302,8 +302,8 @@ static BasicBlock* buildBlock(BuildCtx* ctx, Node* node,
 
     /* ---- assignment / expression ---- */
     if (strcmp(t, "assignment") == 0 ||
-        strcmp(t, "SUM") == 0 || strcmp(t, "MINUS") == 0 ||
-        strcmp(t, "MUL") == 0 || strcmp(t, "SLASH") == 0 ||
+        strcmp(t, "PLUS") == 0 || strcmp(t, "MINUS") == 0 ||
+        strcmp(t, "STAR") == 0 || strcmp(t, "SLASH") == 0 ||
         strcmp(t, "PERCENT") == 0 || strcmp(t, "EQUALITY") == 0 ||
         strcmp(t, "NOTEQUAL") == 0 || strcmp(t, "LESSTHAN") == 0 ||
         strcmp(t, "GREATERTHAN") == 0 || strcmp(t, "LESSTHANEQ") == 0 ||
@@ -331,21 +331,24 @@ static BasicBlock* buildBlock(BuildCtx* ctx, Node* node,
         return buildBlock(ctx, node->left, current, after_block);
     }
 
-    /* ---- if_body (внутренний узел if: left=then, right=else) ---- */
-    if (strcmp(t, "if_body") == 0) {
-        /* Не должен вызываться напрямую — обрабатывается внутри "if" */
-        return buildBlock(ctx, node->left, current, after_block);
+    /* ---- else-chain ---- */
+    if (strcmp(t, "else") == 0) {
+        current = buildBlock(ctx, node->left, current, after_block);
+        if (node->right) {
+            current = buildBlock(ctx, node->right, current, after_block);
+        }
+        return current;
     }
 
     /* ---- IF ---- */
     if (strcmp(t, "if") == 0) {
-        /* Структура: if->left = условие, if->right = if_body(left=then, right=else|NULL) */
+        /* Структура: if->left = condition, if->right = ifStatements(left=then, right=else|NULL) */
         Operation* cond_op = exprToOp(node->left);
         addOperationToBlock(current, createOperation("IF_COND", cond_op, NULL, NULL, 0));
 
         BasicBlock* merge_block = newBlock(ctx);
 
-        Node* if_body = node->right; /* if_body узел */
+        Node* if_body = node->right;
         Node* then_node = if_body ? if_body->left : NULL;
         Node* else_node = if_body ? if_body->right : NULL;
 
@@ -354,31 +357,16 @@ static BasicBlock* buildBlock(BuildCtx* ctx, Node* node,
         current->true_target = then_block;
 
         BasicBlock* then_end = buildBlock(ctx, then_node, then_block, after_block);
-        if (then_end && !then_end->true_target)
+        if (then_end && !then_end->true_target && !then_end->false_target)
             then_end->true_target = merge_block;
 
         if (else_node) {
-            /* Итерируемся по цепочке "else"-узлов:
-             * каждый "else": left = тело ветки, right = следующий "else" или NULL.
-             * cur_cond_block — блок, чья false-ветка ведёт к очередному else. */
-            BasicBlock* cur_cond_block = current;
-            Node* cur_else = else_node;
-
-            while (cur_else && cur_else->type && strcmp(cur_else->type, "else") == 0) {
-                BasicBlock* else_body_block = newBlock(ctx);
-                cur_cond_block->false_target = else_body_block;
-
-                BasicBlock* else_end = buildBlock(ctx, cur_else->left,
-                    else_body_block, after_block);
-                if (else_end && !else_end->true_target)
-                    else_end->true_target = merge_block;
-
-                cur_cond_block = else_body_block;
-                cur_else = cur_else->right;
+            BasicBlock* else_block = newBlock(ctx);
+            current->false_target = else_block;
+            BasicBlock* else_end = buildBlock(ctx, else_node, else_block, after_block);
+            if (else_end && !else_end->true_target && !else_end->false_target) {
+                else_end->true_target = merge_block;
             }
-            /* Последняя false-ветка (цепочка исчерпана) → merge */
-            if (!cur_cond_block->false_target)
-                cur_cond_block->false_target = merge_block;
         }
         else {
             /* Нет else — false ведёт сразу к merge */
@@ -388,59 +376,52 @@ static BasicBlock* buildBlock(BuildCtx* ctx, Node* node,
         return merge_block;
     }
 
-    /* ---- loop: while / until ---- */
+    /* ---- loop: pre-check (while/until listStatement end) or post-check (repeat) ---- */
     if (strcmp(t, "loop") == 0) {
-        BasicBlock* cond_block = newBlock(ctx);
-        BasicBlock* body_block = newBlock(ctx);
-        BasicBlock* exit_block = newBlock(ctx);
+        int is_precheck = (node->right && node->right->type &&
+            strcmp(node->right->type, "listStatement") == 0);
 
-        if (!current->true_target)
-            current->true_target = cond_block;
-
-        Operation* cond_op = exprToOp(node->left);
-        addOperationToBlock(cond_block,
-            createOperation("LOOP_COND", cond_op, NULL,
-                node->value ? node->value : "while", 0));
-
-        cond_block->true_target = body_block;
-        cond_block->false_target = exit_block;
-
-        if (ctx->break_depth < 64)
-            ctx->break_targets[ctx->break_depth++] = exit_block;
-
-        BasicBlock* body_end = buildBlock(ctx, node->right, body_block, exit_block);
-        if (body_end && !body_end->true_target)
-            body_end->true_target = cond_block; /* обратная дуга */
-
-        if (ctx->break_depth > 0) ctx->break_depth--;
-
-        return exit_block;
-    }
-
-    /* ---- repeat: statement while/until expr; ---- */
-    if (strcmp(t, "repeat") == 0) {
         BasicBlock* body_block = newBlock(ctx);
         BasicBlock* cond_block = newBlock(ctx);
         BasicBlock* exit_block = newBlock(ctx);
 
-        if (!current->true_target)
-            current->true_target = body_block;
-
-        if (ctx->break_depth < 64)
+        if (ctx->break_depth < 64) {
             ctx->break_targets[ctx->break_depth++] = exit_block;
+        }
 
-        BasicBlock* body_end = buildBlock(ctx, node->left, body_block, exit_block);
-        if (body_end && !body_end->true_target)
-            body_end->true_target = cond_block;
+        if (is_precheck) {
+            if (!current->true_target) {
+                current->true_target = cond_block;
+            }
 
-        if (ctx->break_depth > 0) ctx->break_depth--;
+            addOperationToBlock(cond_block,
+                createOperation("LOOP_COND", exprToOp(node->left), NULL, "while", 0));
+            cond_block->true_target = body_block;
+            cond_block->false_target = exit_block;
 
-        Operation* cond_op = exprToOp(node->right);
-        addOperationToBlock(cond_block,
-            createOperation("REPEAT_COND", cond_op, NULL,
-                node->value ? node->value : "while", 0));
-        cond_block->true_target = body_block;
-        cond_block->false_target = exit_block;
+            BasicBlock* body_end = buildBlock(ctx, node->right, body_block, exit_block);
+            if (body_end && !body_end->true_target && !body_end->false_target) {
+                body_end->true_target = cond_block;
+            }
+        } else {
+            if (!current->true_target) {
+                current->true_target = body_block;
+            }
+
+            BasicBlock* body_end = buildBlock(ctx, node->right, body_block, exit_block);
+            if (body_end && !body_end->true_target && !body_end->false_target) {
+                body_end->true_target = cond_block;
+            }
+
+            addOperationToBlock(cond_block,
+                createOperation("REPEAT_COND", exprToOp(node->left), NULL, "while", 0));
+            cond_block->true_target = body_block;
+            cond_block->false_target = exit_block;
+        }
+
+        if (ctx->break_depth > 0) {
+            ctx->break_depth--;
+        }
 
         return exit_block;
     }

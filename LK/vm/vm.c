@@ -9,6 +9,14 @@
 #include <stdio.h>
 #include <math.h>
 
+static VMValue vmCopyValue(VMValue src) {
+    VMValue out = src;
+    if (src.type == VM_TYPE_STRING && src.value.string_val) {
+        out.value.string_val = strdup(src.value.string_val);
+    }
+    return out;
+}
+
 VMMemory* vmMemoryCreate(int constants_size, int data_size, int stack_size) {
     VMMemory* mem = (VMMemory*)malloc(sizeof(VMMemory));
     if (!mem) return NULL;
@@ -40,6 +48,12 @@ void vmMemoryFree(VMMemory* mem) {
     if (!mem) return;
 
     free(mem->code_bank.addresses);
+    for (int i = 0; i < mem->constants_bank.count; i++) {
+        if (mem->constants_bank.values[i].type == VM_TYPE_STRING &&
+            mem->constants_bank.values[i].value.string_val) {
+            free(mem->constants_bank.values[i].value.string_val);
+        }
+    }
     free(mem->constants_bank.values);
 
     for (int i = 0; i < mem->data_bank.count; i++) {
@@ -63,7 +77,7 @@ int vmAddConstant(VMMemory* mem, VMValue value) {
     }
 
     int idx = mem->constants_bank.count++;
-    mem->constants_bank.values[idx] = value;
+    mem->constants_bank.values[idx] = vmCopyValue(value);
     return idx;
 }
 
@@ -83,7 +97,7 @@ int vmAddVariable(VMMemory* mem, const char* var_name, VMValue value) {
 
     int idx = mem->data_bank.count++;
     mem->data_bank.var_names[idx] = strdup(var_name);
-    mem->data_bank.values[idx] = value;
+    mem->data_bank.values[idx] = vmCopyValue(value);
     return idx;
 }
 
@@ -114,7 +128,11 @@ void vmSetVariable(VMMemory* mem, const char* var_name, VMValue value) {
         vmAddVariable(mem, var_name, value);
     }
     else {
-        mem->data_bank.values[idx] = value;
+        if (mem->data_bank.values[idx].type == VM_TYPE_STRING &&
+            mem->data_bank.values[idx].value.string_val) {
+            free(mem->data_bank.values[idx].value.string_val);
+        }
+        mem->data_bank.values[idx] = vmCopyValue(value);
     }
 }
 
@@ -373,7 +391,12 @@ static VMValue getOperandValue(VMContext* ctx, Operand* op) {
         return vmMakeInt(op->value.value);
 
     case OPERAND_STRING:
-        return vmMakeString(op->value.name);
+    {
+        VMValue v = vmMakeNone();
+        v.type = VM_TYPE_STRING;
+        v.value.string_val = op->value.name;
+        return v;
+    }
 
     default:
         return vmMakeNone();
@@ -604,10 +627,24 @@ int vmExecuteInstruction(VMContext* ctx) {
         break;
 
     case INSTR_RET:
-        // RET value - вернуться из функции
-        vmPush(ctx->memory, op1_val);
+        // RET value - return to caller if CALL frame exists
+    {
+        VMValue ret_val = op1_val;
+        if (ctx->memory->stack.pointer > 0) {
+            VMValue return_addr = vmPop(ctx->memory);
+            if (return_addr.type == VM_TYPE_INT &&
+                return_addr.value.int_val >= 0 &&
+                return_addr.value.int_val < ctx->code->instruction_count) {
+                vmSetVariable(ctx->memory, "R0", ret_val);
+                ctx->pc = (int)return_addr.value.int_val;
+                return ctx->running;
+            }
+        }
+
+        vmPush(ctx->memory, ret_val);
         ctx->running = 0;
         return 0;
+    }
 
     case INSTR_END:
         ctx->running = 0;

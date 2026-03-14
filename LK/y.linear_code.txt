@@ -1,0 +1,16 @@
+==================================================
+      COMPILED CODE FOR: y
+==================================================
+
+; Function signature: y
+
+; Register allocation:
+
+ASSEMBLY LISTING
+  LABEL           y
+  LABEL           L0
+  JMP             L1
+  LABEL           L1
+  RET             R0
+
+END OF CODE

@@ -1,0 +1,27 @@
+digraph CallGraph {
+  graph [label="Call Graph", fontsize=14];
+  node  [shape=box, style=filled, fillcolor=lightblue, fontname="Courier"];
+
+  "main";
+  "y";
+  "x";
+
+  "main" -> "printf";
+  "main" -> "printf";
+  "main" -> "printf";
+  "main" -> "x";
+  "main" -> "printf";
+  "main" -> "printf";
+  "main" -> "printf";
+  "main" -> "printf";
+  "main" -> "printf";
+  "main" -> "printf";
+  "main" -> "printf";
+  "main" -> "printf";
+  "main" -> "printf";
+  "main" -> "printf";
+  "main" -> "printf";
+  "main" -> "printf";
+  "main" -> "printf";
+  "main" -> "printf";
+}

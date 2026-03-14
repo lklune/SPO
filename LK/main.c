@@ -109,11 +109,22 @@ int main(int argc, char* argv[]) {
         addFileToCollection(file_col, fname, root);
     }
 
-    /* Построение CFG */
+    /* Build CFG */
     printf("\nBuilding CFGs...\n");
     AnalysisResult* result = buildCFGFromAST(file_col);
+    if (!result || !result->functions || !result->errors) {
+        fprintf(stderr, "CFG build failed\n");
+        return 1;
+    }
     CompiledFunctionCollection* compiled = generateCodeFromAST(result->functions);
-    exportAllCompiledFunctions(compiled, "");
+    if (!compiled) {
+        fprintf(stderr, "Code generation failed\n");
+        freeAnalysisResult(result);
+        return 1;
+    }
+
+    const char* code_outdir = outdir ? outdir : ".";
+    exportAllCompiledFunctions(compiled, code_outdir);
 
     /* Ошибки → stderr */
     if (result->errors && result->errors->error_count > 0) {
@@ -175,6 +186,7 @@ int main(int argc, char* argv[]) {
         result->functions->function_count,
         result->errors->error_count);
 
+    freeCompiledFunctionCollection(compiled);
     freeAnalysisResult(result);
     return 0;
 }

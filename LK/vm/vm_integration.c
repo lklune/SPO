@@ -5,6 +5,7 @@
 
 #include "vm.h"
 #include "codegen.h"
+#include "export_code.h"
 #include <stdio.h>
 #include <stdlib.h>
 

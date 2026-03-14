@@ -29,10 +29,10 @@ static void opStr(Operation* op, char* buf, int sz) {
     if (op->left)  opStr(op->left, l, sizeof(l));
     if (op->right) opStr(op->right, r, sizeof(r));
     if (strcmp(t, "assignment") == 0)       snprintf(buf, sz, "%s = %s", l, r);
-    else if (strcmp(t, "SUM") == 0)              snprintf(buf, sz, "%s + %s", l, r);
+    else if (strcmp(t, "PLUS") == 0)             snprintf(buf, sz, "%s + %s", l, r);
     else if (strcmp(t, "MINUS") == 0 && op->right) snprintf(buf, sz, "%s - %s", l, r);
     else if (strcmp(t, "MINUS") == 0)            snprintf(buf, sz, "-%s", l);
-    else if (strcmp(t, "MUL") == 0)              snprintf(buf, sz, "%s * %s", l, r);
+    else if (strcmp(t, "STAR") == 0)             snprintf(buf, sz, "%s * %s", l, r);
     else if (strcmp(t, "SLASH") == 0)            snprintf(buf, sz, "%s / %s", l, r);
     else if (strcmp(t, "PERCENT") == 0)          snprintf(buf, sz, "%s %% %s", l, r);
     else if (strcmp(t, "EQUALITY") == 0)         snprintf(buf, sz, "%s == %s", l, r);
@@ -231,6 +231,7 @@ static void collectCalls(Operation* op, char** calls, int* cnt, int max) {
         if (op->left && op->left->value && *cnt < max)
             calls[(*cnt)++] = op->left->value;
     collectCalls(op->left, calls, cnt, max);
+    collectCalls(op->right, calls, cnt, max);
 }
 
 static void collectCallsFromCFG(CFG* cfg, char** calls, int* cnt, int max) {
