@@ -1,15 +1,28 @@
-import json
+﻿import json
 import sys
 from pathlib import Path
 
 
 def escape_label(label: str) -> str:
-    """Escape quotes and backslashes for Graphviz labels."""
-    return label.replace("\\", "\\\\").replace("\"", "\\\"")
+    """Escape quotes, backslashes and special chars for Graphviz labels."""
+    if not label:
+        return "<empty>"
+    
+    label = label.replace("\\", "\\\\")
+    label = label.replace("\"", "\\\"")
+    label = label.replace("\n", "\\n")
+    label = label.replace("\r", "\\r")
+    label = label.replace("\t", "\\t")
+    
+    # невалидные UTF-8 символы
+    label = label.encode('utf-8', 'ignore').decode('utf-8')
+    
+    return label
 
 
 def emit_node(f, node, parent_id=None):
-    node_id = node.get("id")
+    """Рекурсивно генерируем узлы DOT."""
+    node_id = node.get("id", "unknown")
     name = node.get("name", "<node>")
     label = escape_label(name)
 
@@ -31,42 +44,31 @@ def main():
     input_path = Path(sys.argv[1])
     output_path = Path(sys.argv[2])
 
-    with input_path.open("r", encoding="utf-8") as f:
-        root = json.load(f)
+    try:
+        with input_path.open("r", encoding="utf-8", errors="ignore") as f:
+            root = json.load(f)
+    except json.JSONDecodeError as e:
+        print(f"JSON parsing error: {e}")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Error reading file: {e}")
+        sys.exit(1)
 
-    with output_path.open("w", encoding="utf-8") as f:
-        f.write("digraph AST {\n")
-        f.write("  node [shape=ellipse];\n")
-        emit_node(f, root, None)
-        f.write("}\n")
+    try:
+        with output_path.open("w", encoding="utf-8") as f:
+            f.write("digraph AST {\n")
+            f.write("  node [shape=ellipse, fontname=\"Arial\"];\n")
+            f.write("  rankdir=TB;\n")
+            emit_node(f, root, None)
+            f.write("}\n")
+        
+        print(f"✓ DOT file generated: {output_path}")
+        print(f"  Usage: dot -Tpng {output_path} -o {output_path.stem}.png")
+    
+    except Exception as e:
+        print(f"Error writing file: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
     main()
-
-import json
-
-with open("ast.json") as f:
-    ast = json.load(f)
-
-dot_lines = ["digraph AST {"]
-dot_lines.append("node [shape=box, style=filled, color=lightblue];")
-counter = 0
-
-def build_dot(node):
-    global counter
-    node_id = node["id"]
-    label = node["name"]
-    dot_lines.append(f'{node_id} [label="{label}"];')
-    
-    for child in node.get("children", []):
-        dot_lines.append(f'{node_id} -> {child["id"]};')
-        build_dot(child)
-
-build_dot(ast)
-dot_lines.append("}")
-
-with open("ast.dot", "w") as f:
-    f.write("\n".join(dot_lines))
-
-print("DOT-file ast.dot generated.")
