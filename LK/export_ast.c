@@ -1,4 +1,4 @@
-//
+п»ї//
 //
 //
 
@@ -39,7 +39,7 @@ void exportAstToJson(Node* root, const char* filename) {
 
     FILE* f = fopen(filename, "w");
     if (!f) {
-        fprintf(stderr, "Не удалось создать файл %s\n", filename);
+        fprintf(stderr, "пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ %s\n", filename);
         return;
     }
 

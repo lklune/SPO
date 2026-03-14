@@ -2,7 +2,7 @@
 
 CC=gcc
 CFLAGS=-c
-SOURCES=main.c error.c node.c parser.tab.c lex.yy.c export_ast.c
+SOURCES=main.c error.c node.c parser.tab.c lex.yy.c export_ast.c export_cfg.c cfg.c
 OBJECTS=$(SOURCES:.c=.o)
 EXECUTABLE=printer
 

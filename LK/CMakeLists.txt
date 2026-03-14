@@ -11,4 +11,5 @@ add_executable(SPO_Lab1 main.c
         lex.yy.c
         parser.tab.c
         export_ast.c
+        export_cfg.c
 )
