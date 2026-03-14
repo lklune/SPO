@@ -13,6 +13,8 @@
 #include "export_ast.h"
 #include "cfg.h"
 #include "export_cfg.h"
+#include "codegen.h"
+#include "export_code.h"
 
 extern FILE* yyin;
 extern int   yyparse(void);
@@ -110,6 +112,8 @@ int main(int argc, char* argv[]) {
     /* Построение CFG */
     printf("\nBuilding CFGs...\n");
     AnalysisResult* result = buildCFGFromAST(file_col);
+    CompiledFunctionCollection* compiled = generateCodeFromAST(result->functions);
+    exportAllCompiledFunctions(compiled, "");
 
     /* Ошибки → stderr */
     if (result->errors && result->errors->error_count > 0) {

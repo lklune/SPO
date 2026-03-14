@@ -12,4 +12,7 @@ add_executable(SPO_Lab1 main.c
         parser.tab.c
         export_ast.c
         export_cfg.c
+        codegen.c
+        export_code.c
+        cod.c
 )
