@@ -1,3 +1,6 @@
+bison -d parser/parser.y -o parser/parser.tab.c
+flex -o parser/lex.yy.c parser/lexems.l
+
 1. При запуске ./run_compiler input.txt должны получаться:
 - input.main.dot
 - main.linear_code.txt

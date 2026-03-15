@@ -1,7 +1,4 @@
-﻿/*
- * export_cfg.c
- */
-#include "export_cfg.h"
+﻿#include "export_cfg.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

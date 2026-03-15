@@ -198,15 +198,11 @@
     yylval.node = createNode("IDENTIFIER", NULL, NULL, yytext);
     return IDENTIFIER;
 }
-\/\/.*                               { /* ���������� ����������� */ }
-\n                                  { /* ���������� �������� ����� */ }
-[ \t]                               { /* ���������� ������� � ��������� */ }
-.                                   {
-                                        // ��������� �������������� �������� ��� ������
-                                        fprintf(stderr, "�������������� ������: %s\n", yytext);
-                                    }
+\/\/.*  {}
+\n      {}
+[ \t]   {}
+.       {}
 %%
-
 
 int yywrap(void) {
     // Your implementation here, typically returning 1 to signal EOF.

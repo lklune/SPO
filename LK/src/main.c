@@ -1,10 +1,4 @@
-﻿/*
- * main.c
- * Тестовая программа: разбор входных файлов, построение CFG,
- * экспорт в DOT-файлы.
- */
-
-#include <stdio.h>
+﻿#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 

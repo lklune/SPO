@@ -59,13 +59,11 @@ $(BIN_DIR)/run_compiler: $(SRC_DIR)/main.c $(COMPILER_OBJS) | $(BIN_DIR)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 	@echo "Built: $(BIN_DIR)/run_compiler"
 
-run: $(BIN_DIR)/run_compiler
-
 clean:
 	rm -f $(OBJ_DIR)/*.o $(TARGETS)
 	rm -rf $(GEN_DIR)
 
-run: run | $(GEN_DIR)
+run: $(BIN_DIR)/run_compiler | $(GEN_DIR)
 	./$(BIN_DIR)/run_compiler -o $(GEN_DIR) input.txt
 
 .PHONY: all clean run
