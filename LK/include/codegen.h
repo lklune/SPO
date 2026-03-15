@@ -1,7 +1,3 @@
-//
-// codegen.h - Генерация линейного кода из CFG
-//
-
 #ifndef CODEGEN_H
 #define CODEGEN_H
 
@@ -9,24 +5,20 @@
 #include <stdint.h>
 
 typedef enum {
-    // Перемещение данных
     INSTR_MOV,              // MOV dst, src
     INSTR_LOAD_CONST,       // LOAD_CONST reg, const
 
-    // Арифметические операции
     INSTR_ADD,              // ADD reg1, reg2
     INSTR_SUB,              // SUB reg1, reg2
     INSTR_MUL,              // MUL reg1, reg2
     INSTR_DIV,              // DIV reg1, reg2
     INSTR_MOD,              // MOD reg1, reg2
 
-    // Логические операции
     INSTR_AND,              // AND reg1, reg2
     INSTR_OR,               // OR reg1, reg2
     INSTR_XOR,              // XOR reg1, reg2
     INSTR_NOT,              // NOT reg
 
-    // Побитовые операции
     INSTR_BIT_AND,          // BIT_AND reg1, reg2
     INSTR_BIT_OR,           // BIT_OR reg1, reg2
     INSTR_BIT_XOR,          // BIT_XOR reg1, reg2
@@ -34,92 +26,81 @@ typedef enum {
     INSTR_SHIFT_LEFT,       // SHIFT_LEFT reg, count
     INSTR_SHIFT_RIGHT,      // SHIFT_RIGHT reg, count
 
-    // Сравнение
     INSTR_CMP,              // CMP reg1, reg2
 
-    // Условные переходы
-    INSTR_JEQ,              // JEQ label (если равно)
-    INSTR_JNE,              // JNE label (если не равно)
-    INSTR_JLT,              // JLT label (если <)
-    INSTR_JGT,              // JGT label (если >)
-    INSTR_JLE,              // JLE label (если <=)
-    INSTR_JGE,              // JGE label (если >=)
+    INSTR_JEQ,              // JEQ label
+    INSTR_JNE,              // JNE label
+    INSTR_JLT,              // JLT label
+    INSTR_JGT,              // JGT label
+    INSTR_JLE,              // JLE label
+    INSTR_JGE,              // JGE label
 
-    // Безусловный переход
     INSTR_JMP,              // JMP label
 
-    // Вызовы функций
     INSTR_CALL,             // CALL function_name
     INSTR_RET,              // RET value
 
-    // Вывод
     INSTR_PRINT,            // PRINT reg
     INSTR_PRINT_STR,        // PRINT_STR string
 
-    // Метка (не инструкция, но используется для организации кода)
     INSTR_LABEL,            // label:
 
-    // Завершение
-    INSTR_END,              // конец кода
+    INSTR_END, 
 } InstructionType;
 
 typedef struct {
     enum {
-        OPERAND_REGISTER,   // R0, R1, ...
-        OPERAND_VARIABLE,   // имя переменной
-        OPERAND_CONSTANT,   // число
-        OPERAND_LABEL,      // метка
-        OPERAND_STRING,     // строка
+        OPERAND_REGISTER,
+        OPERAND_VARIABLE,
+        OPERAND_CONSTANT,
+        OPERAND_LABEL,
+        OPERAND_STRING,
     } type;
 
     union {
-        int register_id;    // для OPERAND_REGISTER
-        char* name;         // для OPERAND_VARIABLE или OPERAND_LABEL
-        long value;         // для OPERAND_CONSTANT
+        int register_id;
+        char* name;
+        long value;
     } value;
 } Operand;
 
-// Инструкция ВМ
 typedef struct {
     InstructionType type;
-    Operand operand1;       // Первый операнд (опционально)
-    Operand operand2;       // Второй операнд (опционально)
-    int line_number;        // Номер строки в исходном коде
+    Operand operand1;
+    Operand operand2;
+    int line_number;
 } Instruction;
 
-// Линейный код
 typedef struct {
     Instruction* instructions;
     int instruction_count;
     int max_instructions;
 } LinearCode;
 
-// Привязка переменной к регистру или памяти
 typedef struct {
-    char* var_name;         // Имя переменной
-    int register_id;        // ID регистра (-1 если в памяти)
-    int memory_address;     // Адрес в памяти (-1 если в регистре)
-    int is_constant;        // 1 если константа
-    long constant_value;    // Значение константы
+    char* var_name;
+    int register_id;
+    int memory_address;
+    int is_constant;
+    long constant_value;
 } VariableBinding;
 
-// Распределение регистров
 typedef struct {
     VariableBinding* bindings;
     int binding_count;
     int max_bindings;
 
-    int next_register;      // Следующий свободный регистр
-    int next_memory_addr;   // Следующий свободный адрес памяти
-    int max_registers;      // Максимум регистров
-    int max_memory;         // Максимум памяти
+    int next_register;
+    int next_memory_addr;
+    int max_registers;
+    int max_memory;
 } RegisterAllocator;
 
 typedef struct {
-    FunctionSignature* signature;   // Сигнатура из CFG
-    LinearCode* code;               // Сгенерированный линейный код
-    RegisterAllocator* alloc;       // Информация о регистрах и памяти
-    int code_start_line;            // Строка начала кода
+    FunctionSignature* signature;
+    LinearCode* code;
+    RegisterAllocator* alloc;
+    int code_start_line;
 } CompiledFunction;
 
 typedef struct {
@@ -128,14 +109,12 @@ typedef struct {
     int max_functions;
 } CompiledFunctionCollection;
 
-// Создание операндов
 Operand createRegisterOperand(int reg_id);
 Operand createVariableOperand(const char* var_name);
 Operand createConstantOperand(long value);
 Operand createLabelOperand(const char* label);
 Operand createStringOperand(const char* string);
 
-// Линейный код
 LinearCode* createLinearCode(void);
 void addInstruction(LinearCode* code, InstructionType type,
     Operand op1, Operand op2);

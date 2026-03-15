@@ -1,8 +1,3 @@
-//
-// cod.c
-// Лабораторная работа №3
-//
-
 #include "codegen.h"
 #include <stdlib.h>
 #include <string.h>
@@ -11,13 +6,11 @@
 static int getRegisterForVariable(RegisterAllocator* alloc, const char* var_name) {
     if (!var_name) return -1;
 
-    // Проверка выделен ли регистр
     VariableBinding* binding = findVariableBinding(alloc, var_name);
     if (binding && binding->register_id >= 0) {
         return binding->register_id;
     }
 
-    // Выделяем новый
     int reg = allocateRegister(alloc);
     if (reg >= 0) {
         bindVariable(alloc, var_name, reg, -1);
@@ -25,7 +18,6 @@ static int getRegisterForVariable(RegisterAllocator* alloc, const char* var_name
     return reg;
 }
 
-// Загрузить значение в регистр
 static void loadValueIntoRegister(LinearCode* code, int reg,
     const char* value_str,
     RegisterAllocator* alloc) {
@@ -59,13 +51,11 @@ static void generateCodeFromOperation(LinearCode* code, Operation* op,
         return;
     }
 
-    // Бинарные операции
     if (strcmp(op_type, "SUM") == 0) {
         // a + b
         int reg1 = allocateRegister(alloc);
         int reg2 = allocateRegister(alloc);
 
-        // Рекурсивная генерация кода для операндов
         if (op->left) generateCodeFromOperation(code, op->left, alloc);
         if (op->right) generateCodeFromOperation(code, op->right, alloc);
 
@@ -124,7 +114,6 @@ static void generateCodeFromOperation(LinearCode* code, Operation* op,
         return;
     }
 
-    // Логические операции
     if (strcmp(op_type, "AND") == 0) {
         int reg1 = allocateRegister(alloc);
         int reg2 = allocateRegister(alloc);
@@ -162,7 +151,6 @@ static void generateCodeFromOperation(LinearCode* code, Operation* op,
         return;
     }
 
-    // Сравнения
     if (strcmp(op_type, "EQUALITY") == 0) {
         int reg1 = allocateRegister(alloc);
         int reg2 = allocateRegister(alloc);
@@ -193,15 +181,12 @@ static void generateCodeFromOperation(LinearCode* code, Operation* op,
         return;
     }
 
-    // Присваивание
     if (strcmp(op_type, "assignment") == 0) {
         if (op->left && op->right) {
             int reg = allocateRegister(alloc);
 
-            // код для правой части
             generateCodeFromOperation(code, op->right, alloc);
 
-            // инструкция присваивания
             if (op->left->op_type && strcmp(op->left->op_type, "IDENTIFIER") == 0) {
                 char* var_name = op->left->value ? op->left->value : "?";
                 addInstruction(code, INSTR_MOV,

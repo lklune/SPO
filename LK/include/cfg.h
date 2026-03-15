@@ -1,8 +1,4 @@
-﻿//
-// ��������� ������
-// 
-
-#ifndef CFG_H
+﻿#ifndef CFG_H
 #define CFG_H
 
 #include "node.h"
@@ -101,61 +97,30 @@ struct AnalysisResult {
     ErrorCollection* errors;
 };
 
-// ������� ����� ��������
 Operation* createOperation(char* op_type, Operation* left, Operation* right, const char* value, int line_number);
-
-// ���������� ������, ������� ��������� � ����� � �������������
 void freeOperation(Operation* op);
 
-// ������� ����� ������� ����
 BasicBlock* createBasicBlock(int id);
-
-// �������� �������� � ������� ����
 void addOperationToBlock(BasicBlock* block, Operation* op);
-
-// ���������� ������, ������� ������� ������
 void freeBasicBlock(BasicBlock* block);
 
-// ������� ����� ���� ������ ����������
 CFG* createCFG(void);
-
-// �������� ������� ���� � CFG
 void addBlockToCFG(CFG* cfg, BasicBlock* block);
-
-// ���������� ������, ������� CFG
 void freeCFG(CFG* cfg);
 
-// ������� ����� �������
 Function* createFunction(FunctionSignature* signature, CFG* cfg, const char* source_file);
-
-// ���������� ������, ������� ��������
 void freeFunction(Function* func);
 
-// ������� ��������� ������
 FileCollection* createFileCollection(void);
-
-// �������� ���� � ���������
 void addFileToCollection(FileCollection* collection, const char* filename, Node* ast);
-
-// ������� ��������� �������
 FunctionCollection* createFunctionCollection(void);
-
-// �������� ������� � ���������
 void addFunctionToCollection(FunctionCollection* collection, Function* func);
-
-// ������� ��������� ������
 ErrorCollection* createErrorCollection(void);
-
-// �������� ������ � ���������
 void addErrorToCollection(ErrorCollection* collection, const char* message, const char* filename, int line_number);
 
-// ������� ��������� �������
 AnalysisResult* createAnalysisResult(FunctionCollection* functions, ErrorCollection* errors);
-
-// ���������� ������, ������� ����������� �������
 void freeAnalysisResult(AnalysisResult* result);
 
-// ��������� ���� ������ ���������� �� ������ AST ������
 AnalysisResult* buildCFGFromAST(FileCollection* file_collection);
 
 #endif // CFG_H

@@ -4,16 +4,23 @@
     <None Include="lexems.l" />
     <None Include="parser.y" />
     <None Include="json_to_dot.py" />
+    <None Include="target.pdsl" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="CMakeLists.txt" />
     <Text Include="input.txt" />
+    <Text Include="input2.txt" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="error.h" />
     <ClInclude Include="node.h" />
     <ClInclude Include="parser.tab.h" />
     <ClInclude Include="export_ast.h" />
+    <ClInclude Include="cfg.h" />
+    <ClInclude Include="codegen.h" />
+    <ClInclude Include="export_cfg.h" />
+    <ClInclude Include="export_code.h" />
+    <ClInclude Include="vm\vm.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="error.c" />
@@ -23,5 +30,13 @@
     <ClCompile Include="lex.yy.c" />
     <ClCompile Include="main.c" />
     <ClCompile Include="export_ast.c" />
+    <ClCompile Include="cfg.c" />
+    <ClCompile Include="cod.c" />
+    <ClCompile Include="codegen.c" />
+    <ClCompile Include="export_cfg.c" />
+    <ClCompile Include="export_code.c" />
+    <ClCompile Include="vm\test_vm.c" />
+    <ClCompile Include="vm\vm.c" />
+    <ClCompile Include="vm\vm_integration.c" />
   </ItemGroup>
 </Project>

@@ -1,86 +1,71 @@
 # Makefile for lab 3
-
 CC = gcc
-CFLAGS = -Wall -Wextra -g
+CFLAGS = -Wall -Wextra -g -Iinclude -Iparser
 LDFLAGS = -lm
 
-VM_DIR = vm
-VM_CFLAGS = $(CFLAGS) -I.
+BIN_DIR = bin
+OBJ_DIR = obj
+GEN_DIR = generated
+SRC_DIR = src
+INCLUDE_DIR = include
+PARSER_DIR = parser
 
 COMPILER_OBJS = \
-	node.o \
-	error.o \
-	cfg.o \
-	codegen.o \
-	export_ast.o \
-	export_cfg.o \
-	export_code.o \
-	vm.o \
-	vm_integration.o \
-	lex.yy.o \
-	parser.tab.o
+	$(OBJ_DIR)/node.o \
+	$(OBJ_DIR)/error.o \
+	$(OBJ_DIR)/cfg.o \
+	$(OBJ_DIR)/codegen.o \
+	$(OBJ_DIR)/export_ast.o \
+	$(OBJ_DIR)/export_cfg.o \
+	$(OBJ_DIR)/export_code.o \
+	$(OBJ_DIR)/lex.yy.o \
+	$(OBJ_DIR)/parser.tab.o
 
-TEST_OBJS = \
-	node.o \
-	error.o \
-	codegen.o \
-	vm.o \
-	test_vm.o
-
-TARGETS = test_vm run_compiler
+TARGETS = $(BIN_DIR)/run_compiler
 
 all: $(TARGETS)
 
-node.o: node.c node.h
+$(BIN_DIR) $(OBJ_DIR) $(GEN_DIR):
+	mkdir -p $@
+
+$(OBJ_DIR)/node.o: $(SRC_DIR)/node.c $(INCLUDE_DIR)/node.h | $(OBJ_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-error.o: error.c error.h
+$(OBJ_DIR)/error.o: $(SRC_DIR)/error.c $(INCLUDE_DIR)/error.h | $(OBJ_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-cfg.o: cfg.c cfg.h
+$(OBJ_DIR)/cfg.o: $(SRC_DIR)/cfg.c $(INCLUDE_DIR)/cfg.h | $(OBJ_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-codegen.o: codegen.c codegen.h cfg.h
+$(OBJ_DIR)/codegen.o: $(SRC_DIR)/codegen.c $(INCLUDE_DIR)/codegen.h $(INCLUDE_DIR)/cfg.h | $(OBJ_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-export_ast.o: export_ast.c export_ast.h node.h
+$(OBJ_DIR)/export_ast.o: $(SRC_DIR)/export_ast.c $(INCLUDE_DIR)/export_ast.h $(INCLUDE_DIR)/node.h | $(OBJ_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-export_cfg.o: export_cfg.c export_cfg.h cfg.h
+$(OBJ_DIR)/export_cfg.o: $(SRC_DIR)/export_cfg.c $(INCLUDE_DIR)/export_cfg.h $(INCLUDE_DIR)/cfg.h | $(OBJ_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-export_code.o: export_code.c export_code.h codegen.h
+$(OBJ_DIR)/export_code.o: $(SRC_DIR)/export_code.c $(INCLUDE_DIR)/export_code.h $(INCLUDE_DIR)/codegen.h | $(OBJ_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-vm.o: $(VM_DIR)/vm.c $(VM_DIR)/vm.h codegen.h
-	$(CC) $(VM_CFLAGS) -c $< -o $@
+$(OBJ_DIR)/lex.yy.o: $(PARSER_DIR)/lex.yy.c $(INCLUDE_DIR)/error.h $(PARSER_DIR)/parser.tab.h | $(OBJ_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
 
-vm_integration.o: $(VM_DIR)/vm_integration.c $(VM_DIR)/vm.h codegen.h export_code.h
-	$(CC) $(VM_CFLAGS) -c $< -o $@
+$(OBJ_DIR)/parser.tab.o: $(PARSER_DIR)/parser.tab.c $(PARSER_DIR)/parser.tab.h $(INCLUDE_DIR)/node.h $(INCLUDE_DIR)/error.h | $(OBJ_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
 
-test_vm.o: $(VM_DIR)/test_vm.c $(VM_DIR)/vm.h codegen.h
-	$(CC) $(VM_CFLAGS) -c $< -o $@
-
-test_vm: $(TEST_OBJS)
+$(BIN_DIR)/run_compiler: $(SRC_DIR)/main.c $(COMPILER_OBJS) | $(BIN_DIR)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
-	@echo "Built: test_vm"
+	@echo "Built: $(BIN_DIR)/run_compiler"
 
-run_compiler: main.c $(COMPILER_OBJS)
-	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
-	@echo "Built: run_compiler"
+run: $(BIN_DIR)/run_compiler
 
 clean:
-	rm -f *.o $(TARGETS)
-	@echo "Cleaned"
+	rm -f $(OBJ_DIR)/*.o $(TARGETS)
+	rm -rf $(GEN_DIR)
 
-test: test_vm
-	./test_vm
+run: run | $(GEN_DIR)
+	./$(BIN_DIR)/run_compiler -o $(GEN_DIR) input.txt
 
-test-verbose: test_vm
-	./test_vm -v
-
-help:
-	@echo "Usage: make [target]"
-	@echo "Targets: all run_compiler test_vm test test-verbose clean help"
-
-.PHONY: all clean test test-verbose help
+.PHONY: all clean run

@@ -4,6 +4,194 @@
 #include <stdlib.h>
 #include <string.h>
 
+static VariableBinding* findBindingByName(RegisterAllocator* alloc, const char* name) {
+    if (!alloc || !name) {
+        return NULL;
+    }
+
+    for (int i = 0; i < alloc->binding_count; i++) {
+        VariableBinding* binding = &alloc->bindings[i];
+        if (binding->var_name && strcmp(binding->var_name, name) == 0) {
+            return binding;
+        }
+    }
+
+    return NULL;
+}
+
+static void formatAsmOperand(Operand* operand,
+    RegisterAllocator* alloc,
+    char* buffer,
+    int buffer_size) {
+    if (!operand || !buffer || buffer_size <= 0) {
+        return;
+    }
+
+    buffer[0] = '\0';
+
+    switch (operand->type) {
+    case OPERAND_REGISTER:
+        snprintf(buffer, (size_t)buffer_size, "r%d", operand->value.register_id);
+        break;
+    case OPERAND_CONSTANT:
+        snprintf(buffer, (size_t)buffer_size, "%ld", operand->value.value);
+        break;
+    case OPERAND_LABEL:
+        snprintf(buffer, (size_t)buffer_size, "%s", operand->value.name ? operand->value.name : "?");
+        break;
+    case OPERAND_VARIABLE:
+    {
+        VariableBinding* binding = findBindingByName(alloc, operand->value.name);
+        if (binding && binding->memory_address >= 0) {
+            snprintf(buffer, (size_t)buffer_size, "%d", binding->memory_address);
+        }
+        else {
+            snprintf(buffer, (size_t)buffer_size, "0");
+        }
+        break;
+    }
+    case OPERAND_STRING:
+        snprintf(buffer, (size_t)buffer_size, "\"%s\"", operand->value.name ? operand->value.name : "");
+        break;
+    default:
+        snprintf(buffer, (size_t)buffer_size, "?");
+        break;
+    }
+}
+
+static void printAsmInstruction(FILE* f, Instruction* instr, RegisterAllocator* alloc) {
+    char op1[256] = "";
+    char op2[256] = "";
+
+    if (!f || !instr) {
+        return;
+    }
+
+    if (instr->type == INSTR_LABEL) {
+        formatAsmOperand(&instr->operand1, alloc, op1, (int)sizeof(op1));
+        fprintf(f, "%s:\n", op1);
+        return;
+    }
+
+    formatAsmOperand(&instr->operand1, alloc, op1, (int)sizeof(op1));
+    formatAsmOperand(&instr->operand2, alloc, op2, (int)sizeof(op2));
+
+    switch (instr->type) {
+    case INSTR_MOV:
+        if (instr->operand1.type == OPERAND_VARIABLE && instr->operand2.type == OPERAND_REGISTER) {
+            fprintf(f, "ST %s, %s\n", op2, op1);
+        }
+        else if (instr->operand1.type == OPERAND_REGISTER && instr->operand2.type == OPERAND_VARIABLE) {
+            fprintf(f, "LD %s, %s\n", op2, op1);
+        }
+        else {
+            fprintf(f, "MOV %s, %s\n", op2, op1);
+        }
+        break;
+
+    case INSTR_LOAD_CONST:
+        fprintf(f, "MOV %s, %s\n", op2, op1);
+        break;
+
+    case INSTR_ADD:
+        fprintf(f, "ADD %s, %s\n", op1, op2);
+        break;
+    case INSTR_SUB:
+        fprintf(f, "SUB %s, %s\n", op1, op2);
+        break;
+    case INSTR_MUL:
+        fprintf(f, "MUL %s, %s\n", op1, op2);
+        break;
+    case INSTR_DIV:
+        fprintf(f, "DIV %s, %s\n", op1, op2);
+        break;
+    case INSTR_MOD:
+        fprintf(f, "MOD %s, %s\n", op1, op2);
+        break;
+    case INSTR_AND:
+        fprintf(f, "AND %s, %s\n", op1, op2);
+        break;
+    case INSTR_OR:
+        fprintf(f, "OR %s, %s\n", op1, op2);
+        break;
+    case INSTR_XOR:
+        fprintf(f, "XOR %s, %s\n", op1, op2);
+        break;
+    case INSTR_BIT_AND:
+        fprintf(f, "BIT_AND %s, %s\n", op1, op2);
+        break;
+    case INSTR_BIT_OR:
+        fprintf(f, "BIT_OR %s, %s\n", op1, op2);
+        break;
+    case INSTR_BIT_XOR:
+        fprintf(f, "BIT_XOR %s, %s\n", op1, op2);
+        break;
+    case INSTR_SHIFT_LEFT:
+        fprintf(f, "SHIFT_LEFT %s, %s\n", op1, op2);
+        break;
+    case INSTR_SHIFT_RIGHT:
+        fprintf(f, "SHIFT_RIGHT %s, %s\n", op1, op2);
+        break;
+    case INSTR_NOT:
+        fprintf(f, "NOT %s\n", op1);
+        break;
+    case INSTR_BIT_NOT:
+        fprintf(f, "BIT_NOT %s\n", op1);
+        break;
+    case INSTR_CMP:
+        fprintf(f, "CMP %s, %s\n", op1, op2);
+        break;
+    case INSTR_JEQ:
+        fprintf(f, "JEQ %s\n", op1);
+        break;
+    case INSTR_JNE:
+        fprintf(f, "JNE %s\n", op1);
+        break;
+    case INSTR_JLT:
+        fprintf(f, "JLT %s\n", op1);
+        break;
+    case INSTR_JGT:
+        fprintf(f, "JGT %s\n", op1);
+        break;
+    case INSTR_JLE:
+        fprintf(f, "JLE %s\n", op1);
+        break;
+    case INSTR_JGE:
+        fprintf(f, "JGE %s\n", op1);
+        break;
+    case INSTR_JMP:
+        fprintf(f, "JMP %s\n", op1);
+        break;
+    case INSTR_CALL:
+        fprintf(f, "CALL %s\n", op1);
+        break;
+    case INSTR_PRINT:
+        fprintf(f, "OUT %s\n", op1);
+        break;
+    case INSTR_PRINT_STR:
+        fprintf(f, "; unsupported PRINT_STR %s\n", op1);
+        break;
+    case INSTR_RET:
+        if (instr->operand1.type == OPERAND_REGISTER && instr->operand1.value.register_id != 0) {
+            fprintf(f, "MOV %s, r0\n", op1);
+        }
+        else if (instr->operand1.type == OPERAND_VARIABLE) {
+            fprintf(f, "LD %s, r0\n", op1);
+        }
+        else if (instr->operand1.type == OPERAND_CONSTANT) {
+            fprintf(f, "MOV %s, r0\n", op1);
+        }
+        fprintf(f, "RET\n");
+        break;
+    case INSTR_END:
+        fprintf(f, "END\n");
+        break;
+    default:
+        fprintf(f, "; unsupported instruction %s\n", instructionToMnemonic(instr->type));
+        break;
+    }
+}
+
 static int instructionOperandCount(InstructionType type) {
     switch (type) {
     case INSTR_END:
@@ -119,57 +307,11 @@ void exportCompiledFunction(CompiledFunction* func, const char* filepath) {
         return;
     }
 
-    fprintf(f, "==================================================\n");
-    fprintf(f, "      COMPILED CODE FOR: %s\n", func->signature && func->signature->name ? func->signature->name : "unknown");
-    fprintf(f, "==================================================\n\n");
-
-    if (func->signature) {
-        fprintf(f, "; Function signature: %s", func->signature->name ? func->signature->name : "unknown");
-        if (func->signature->return_type) {
-            fprintf(f, " -> %s", func->signature->return_type);
-        }
-        fprintf(f, "\n");
-
-        if (func->signature->args) {
-            fprintf(f, "; Parameters: ");
-            FunctionArg* arg = func->signature->args;
-            int first = 1;
-            while (arg) {
-                if (!first) {
-                    fprintf(f, ", ");
-                }
-                fprintf(f, "%s: %s", arg->name ? arg->name : "?", arg->type ? arg->type : "?");
-                first = 0;
-                arg = arg->next;
-            }
-            fprintf(f, "\n");
-        }
-        fprintf(f, "\n");
-    }
-
-    fprintf(f, "; Register allocation:\n");
-    if (func->alloc) {
-        for (int i = 0; i < func->alloc->binding_count; i++) {
-            VariableBinding* binding = &func->alloc->bindings[i];
-            fprintf(f, ";   ");
-            if (binding->register_id >= 0) {
-                fprintf(f, "R%d: %s", binding->register_id, binding->var_name);
-            } else if (binding->memory_address >= 0) {
-                fprintf(f, "MEM[%d]: %s", binding->memory_address, binding->var_name);
-            }
-            fprintf(f, "\n");
-        }
-    }
-    fprintf(f, "\n");
-
-    fprintf(f, "ASSEMBLY LISTING\n");
     if (func->code) {
         for (int i = 0; i < func->code->instruction_count; i++) {
-            printInstruction(f, &func->code->instructions[i]);
+            printAsmInstruction(f, &func->code->instructions[i], func->alloc);
         }
     }
-
-    fprintf(f, "\nEND OF CODE\n");
     fclose(f);
 }
 
@@ -210,7 +352,8 @@ void exportCompiledFunctionsToSingleFile(CompiledFunctionCollection* collection,
                 VariableBinding* binding = &func->alloc->bindings[j];
                 if (binding->register_id >= 0) {
                     fprintf(f, "  R%d: %s\n", binding->register_id, binding->var_name);
-                } else if (binding->memory_address >= 0) {
+                }
+                else if (binding->memory_address >= 0) {
                     fprintf(f, "  MEM[%d]: %s\n", binding->memory_address, binding->var_name);
                 }
             }

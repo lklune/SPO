@@ -4,3 +4,10 @@ obj/
 *.user
 *.suo
 *.log
+*.o
+*.dot
+run_compiler
+*.ptptb
+*.json
+RemoteTasks/
+generated/
