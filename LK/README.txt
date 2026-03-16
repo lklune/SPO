@@ -7,6 +7,14 @@ make clean
 make run
 ./bin/run_compiler -o generated calc.src
 
+
+export id=$(tt -w -id -s Assemble asmListing generated/program.asm definitionFile vm.target.pdsl archName vm)
+tt -g "$id" -r stderr.txt
+tt -g "$id" -r stdout.txt
+tt -g "$id" -r out.ptptb > out.ptptb
+tt -il -s ExecuteBinaryWithInteractiveInput definitionFile vm.target.pdsl stdinRegStName sin stdoutRegStName sout archName vm binaryFileToRun out.ptptb ipRegStorageName ipst finishMnemonicName END codeRamBankName code_ram
+
+
 После make run должны появляться:
 - generated/input.main.dot
 - generated/main.linear_code.txt

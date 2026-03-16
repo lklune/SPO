@@ -1,3 +1,14 @@
+def fib(n of int)
+    int r;
+
+    r = 1;
+
+    if n > 2 than
+    {
+        r = fib(n - 2) + fib(n - 1);
+    }
+end
+
 def main()
     int acc;
     byte op;

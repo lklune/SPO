@@ -165,6 +165,12 @@ static void printAsmInstruction(FILE* f, Instruction* instr, RegisterAllocator* 
     case INSTR_CALL:
         fprintf(f, "CALL %s\n", op1);
         break;
+    case INSTR_PUSH:
+        fprintf(f, "PUSH %s\n", op1);
+        break;
+    case INSTR_POP:
+        fprintf(f, "POP %s\n", op1);
+        break;
     case INSTR_PRINT:
         fprintf(f, "OUT %s\n", op1);
         break;
@@ -205,6 +211,8 @@ static int instructionOperandCount(InstructionType type) {
     case INSTR_JGE:
     case INSTR_JMP:
     case INSTR_CALL:
+    case INSTR_PUSH:
+    case INSTR_POP:
     case INSTR_RET:
     case INSTR_PRINT:
     case INSTR_PRINT_STR:
@@ -245,6 +253,8 @@ const char* instructionToMnemonic(InstructionType type) {
     case INSTR_JMP:         return "JMP";
     case INSTR_CALL:        return "CALL";
     case INSTR_RET:         return "RET";
+    case INSTR_PUSH:        return "PUSH";
+    case INSTR_POP:         return "POP";
     case INSTR_PRINT:       return "PRINT";
     case INSTR_PRINT_STR:   return "PRINT_STR";
     case INSTR_LABEL:       return "LABEL";
@@ -368,34 +378,6 @@ static void appendRuntime(FILE* f) {
     fprintf(f, "\tCALL readByte\n");
     fprintf(f, "\tMOV r0, r1\n");
     fprintf(f, "\tJMP readDigit_skip\n");
-
-    fprintf(f, "\nfib:\n");
-    fprintf(f, "\tMOV 268435455, r3\n");
-    fprintf(f, "\tBIT_AND r0, r3\n");
-    fprintf(f, "\tMOV r0, r1\n");
-    fprintf(f, "\tCMP r1, 3\n");
-    fprintf(f, "\tJLT fib_base\n");
-    fprintf(f, "\tMOV 1, r0\n");
-    fprintf(f, "\tMOV 1, r2\n");
-    fprintf(f, "\tMOV r1, r3\n");
-    fprintf(f, "\tMOV 2, r1\n");
-    fprintf(f, "\tSUB r3, r1\n");
-    fprintf(f, "fib_loop:\n");
-    fprintf(f, "\tCMP r3, 0\n");
-    fprintf(f, "\tJEQ fib_done\n");
-    fprintf(f, "\tMOV r2, r1\n");
-    fprintf(f, "\tADD r1, r0\n");
-    fprintf(f, "\tMOV r2, r0\n");
-    fprintf(f, "\tMOV r1, r2\n");
-    fprintf(f, "\tMOV 1, r1\n");
-    fprintf(f, "\tSUB r3, r1\n");
-    fprintf(f, "\tJMP fib_loop\n");
-    fprintf(f, "fib_done:\n");
-    fprintf(f, "\tMOV r2, r0\n");
-    fprintf(f, "\tRET\n");
-    fprintf(f, "fib_base:\n");
-    fprintf(f, "\tMOV 1, r0\n");
-    fprintf(f, "\tRET\n");
 
 }
 

@@ -39,6 +39,8 @@ typedef enum {
 
     INSTR_CALL,             // CALL function_name
     INSTR_RET,              // RET value
+    INSTR_PUSH,             // PUSH reg
+    INSTR_POP,              // POP reg
 
     INSTR_PRINT,            // PRINT reg
     INSTR_PRINT_STR,        // PRINT_STR string
