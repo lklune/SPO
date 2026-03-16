@@ -44,6 +44,11 @@ def main()
             acc = fib(operand);
         }
 
+        if op == 47 than
+        {
+            acc = acc / operand;
+        }
+
         writeInt(acc);
         writeByte(10);
         op = readOp();
