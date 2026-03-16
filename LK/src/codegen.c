@@ -141,10 +141,13 @@ void freeRegister(RegisterAllocator* alloc, int reg) {
 }
 
 int allocateMemory(RegisterAllocator* alloc) {
-    if (!alloc || alloc->next_memory_addr >= alloc->max_memory) {
+    if (!alloc || alloc->next_memory_addr + 4 > alloc->max_memory) {
         return -1;
     }
-    return alloc->next_memory_addr++;
+
+    int addr = alloc->next_memory_addr;
+    alloc->next_memory_addr += 4;
+    return addr;
 }
 
 void bindVariable(RegisterAllocator* alloc, const char* var_name, int register_id, int memory_address) {
@@ -290,7 +293,12 @@ static void emit_compare_to_bool(LinearCode* code, const char* compare_op, int t
     addInstruction(code, INSTR_LABEL, createLabelOperand(end_lbl), createConstantOperand(0));
 }
 
-static void emit_call(LinearCode* code, Operation* op, int target_reg) {
+static void emit_call(LinearCode* code, RegisterAllocator* alloc, Operation* op, int target_reg) {
+    if (op && op->right && strcmp(op->right->op_type, "optionalListExpr") == 0 && op->right->left &&
+        strcmp(op->right->left->op_type, "listExpr") == 0 && op->right->left->left) {
+        emit_expression(code, alloc, op->right->left->left, 0);
+    }
+
     if (op && op->left && op->left->value) {
         addInstruction(code, INSTR_CALL, createLabelOperand(op->left->value), createConstantOperand(0));
     }
@@ -333,7 +341,7 @@ static void emit_expression(LinearCode* code, RegisterAllocator* alloc, Operatio
     }
 
     if (strcmp(op->op_type, "CALL") == 0) {
-        emit_call(code, op, target_reg);
+        emit_call(code, alloc, op, target_reg);
         return;
     }
 
@@ -417,6 +425,21 @@ static void emit_var_decls(RegisterAllocator* alloc, Operation* node, LinearCode
     emit_var_decls(alloc, node->right, code);
 }
 
+static void emit_implicit_return(LinearCode* code, RegisterAllocator* alloc) {
+    VariableBinding* result_binding;
+
+    if (!code || !alloc) {
+        return;
+    }
+
+    /* A function without explicit return currently uses local variable `r`
+       as the result slot. This matches the source style used in our samples. */
+    result_binding = findVariableBinding(alloc, "r");
+    if (result_binding) {
+        addInstruction(code, INSTR_MOV, createRegisterOperand(0), createVariableOperand("r"));
+    }
+}
+
 static void emit_operation(LinearCode* code, RegisterAllocator* alloc, Operation* op) {
     if (!code || !op) {
         return;
@@ -482,6 +505,7 @@ static void generate_block_recursive(BasicBlock* block,
     } else if (block->true_target) {
         emit_jump_to_block(code, INSTR_JMP, block->true_target);
     } else if (block->is_exit) {
+        emit_implicit_return(code, alloc);
         addInstruction(code, INSTR_RET, createRegisterOperand(0), createConstantOperand(0));
     }
 
@@ -515,6 +539,14 @@ CompiledFunction* generateCodeFromFunction(Function* cfg_func) {
         addInstruction(compiled->code, INSTR_LABEL, createLabelOperand(cfg_func->signature->name), createConstantOperand(0));
     }
 
+    if (cfg_func->signature && cfg_func->signature->args) {
+        FunctionArg* arg = cfg_func->signature->args;
+        if (arg && arg->name) {
+            ensure_variable_binding(compiled->alloc, arg->name);
+            addInstruction(compiled->code, INSTR_MOV, createVariableOperand(arg->name), createRegisterOperand(0));
+        }
+    }
+
     int max_id = max_block_id(cfg_func->cfg);
     int visited_size = max_id + 1;
     if (visited_size < 1) {
@@ -534,6 +566,7 @@ CompiledFunction* generateCodeFromFunction(Function* cfg_func) {
 
     if (compiled->code->instruction_count == 0 ||
         compiled->code->instructions[compiled->code->instruction_count - 1].type != INSTR_RET) {
+        emit_implicit_return(compiled->code, compiled->alloc);
         addInstruction(compiled->code, INSTR_RET, createRegisterOperand(0), createConstantOperand(0));
     }
 

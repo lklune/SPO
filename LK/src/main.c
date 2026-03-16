@@ -120,6 +120,13 @@ int main(int argc, char* argv[]) {
     const char* code_outdir = outdir ? outdir : ".";
     exportAllCompiledFunctions(compiled, code_outdir);
 
+    {
+        char program_path[1024];
+        snprintf(program_path, sizeof(program_path), "%s/program.asm", code_outdir);
+        exportProgramAsm(compiled, program_path);
+        printf("Exporting combined code: %s\n", program_path);
+    }
+
     /* Ошибки → stderr */
     if (result->errors && result->errors->error_count > 0) {
         Error* e = result->errors->errors;

@@ -2,11 +2,10 @@
 
 Генерация парсера:
 bison -d parser/parser.y -o parser/parser.tab.c
-flex --nounput --noinput -o parser/lex.yy.c parser/lexems.l
-
-Сборка и запуск компилятора:
+flex -o parser/lex.yy.c parser/lexems.l
 make clean
 make run
+./bin/run_compiler -o generated calc.src
 
 После make run должны появляться:
 - generated/input.main.dot
@@ -46,3 +45,10 @@ export id=$(tt -w -id -s Disassemble in.ptptb out.ptptb definitionFile vm.target
 tt -g "$id" -r stderr.txt
 tt -g "$id" -r stdout.txt
 tt -g "$id" -r disasmListing.txt > disasmListing.txt
+
+
+expr EQUAL EQUAL expr
+$1 — левое выражение
+$2 — первый =
+$3 — второй =
+$4 — правое выражение

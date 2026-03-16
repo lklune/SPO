@@ -349,8 +349,14 @@ static BasicBlock* buildBlock(BuildCtx* ctx, Node* node,
         BasicBlock* merge_block = newBlock(ctx);
 
         Node* if_body = node->right;
-        Node* then_node = if_body ? if_body->left : NULL;
-        Node* else_node = if_body ? if_body->right : NULL;
+        Node* then_node = NULL;
+        Node* else_node = NULL;
+
+        /* parser.y stores ifStatements(left = THAN token, right = then statement).
+           So the executable body lives in right, not left. */
+        if (if_body) {
+            then_node = if_body->right;
+        }
 
         /* Создаём then-блок */
         BasicBlock* then_block = newBlock(ctx);

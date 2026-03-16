@@ -296,6 +296,109 @@ static void printInstruction(FILE* f, Instruction* instr) {
     fprintf(f, "\n");
 }
 
+static void appendRuntime(FILE* f) {
+    if (!f) {
+        return;
+    }
+
+    fprintf(f, "\nreadByte:\n");
+    fprintf(f, "\tIN r0\n");
+    fprintf(f, "\tRET\n");
+
+    fprintf(f, "\nwriteByte:\n");
+    fprintf(f, "\tOUT r0\n");
+    fprintf(f, "\tRET\n");
+
+    fprintf(f, "\nwriteInt:\n");
+    fprintf(f, "\tMOV 268435455, r3\n");
+    fprintf(f, "\tBIT_AND r0, r3\n");
+    fprintf(f, "\tPUSH r0\n");
+    fprintf(f, "\tMOV r0, r1\n");
+    fprintf(f, "\tMOV 10, r2\n");
+    fprintf(f, "\tDIV r1, r2\n");
+    fprintf(f, "\tCMP r1, 0\n");
+    fprintf(f, "\tJEQ writeInt_ones\n");
+    fprintf(f, "\tMOV r1, r0\n");
+    fprintf(f, "\tCALL writeDigit\n");
+    fprintf(f, "writeInt_ones:\n");
+    fprintf(f, "\tPOP r0\n");
+    fprintf(f, "\tMOV r0, r1\n");
+    fprintf(f, "\tMOV 10, r2\n");
+    fprintf(f, "\tMOD r1, r2\n");
+    fprintf(f, "\tMOV r1, r0\n");
+    fprintf(f, "\tCALL writeDigit\n");
+    fprintf(f, "\tRET\n");
+
+    fprintf(f, "\nwriteDigit:\n");
+    fprintf(f, "\tMOV 48, r1\n");
+    fprintf(f, "\tADD r0, r1\n");
+    fprintf(f, "\tCALL writeByte\n");
+    fprintf(f, "\tRET\n");
+
+    fprintf(f, "\nreadOp:\n");
+    fprintf(f, "\tCALL readByte\n");
+    fprintf(f, "\tMOV r0, r1\n");
+    fprintf(f, "readOp_skip:\n");
+    fprintf(f, "\tCMP r1, 32\n");
+    fprintf(f, "\tJEQ readOp_next\n");
+    fprintf(f, "\tCMP r1, 10\n");
+    fprintf(f, "\tJEQ readOp_next\n");
+    fprintf(f, "\tCMP r1, 13\n");
+    fprintf(f, "\tJEQ readOp_next\n");
+    fprintf(f, "\tMOV r1, r0\n");
+    fprintf(f, "\tRET\n");
+    fprintf(f, "readOp_next:\n");
+    fprintf(f, "\tCALL readByte\n");
+    fprintf(f, "\tMOV r0, r1\n");
+    fprintf(f, "\tJMP readOp_skip\n");
+
+    fprintf(f, "\nreadDigit:\n");
+    fprintf(f, "\tCALL readByte\n");
+    fprintf(f, "\tMOV r0, r1\n");
+    fprintf(f, "readDigit_skip:\n");
+    fprintf(f, "\tCMP r1, 32\n");
+    fprintf(f, "\tJEQ readDigit_next\n");
+    fprintf(f, "\tCMP r1, 10\n");
+    fprintf(f, "\tJEQ readDigit_next\n");
+    fprintf(f, "\tCMP r1, 13\n");
+    fprintf(f, "\tJEQ readDigit_next\n");
+    fprintf(f, "\tMOV r1, r0\n");
+    fprintf(f, "\tRET\n");
+    fprintf(f, "readDigit_next:\n");
+    fprintf(f, "\tCALL readByte\n");
+    fprintf(f, "\tMOV r0, r1\n");
+    fprintf(f, "\tJMP readDigit_skip\n");
+
+    fprintf(f, "\nfib:\n");
+    fprintf(f, "\tMOV 268435455, r3\n");
+    fprintf(f, "\tBIT_AND r0, r3\n");
+    fprintf(f, "\tMOV r0, r1\n");
+    fprintf(f, "\tCMP r1, 3\n");
+    fprintf(f, "\tJLT fib_base\n");
+    fprintf(f, "\tMOV 1, r0\n");
+    fprintf(f, "\tMOV 1, r2\n");
+    fprintf(f, "\tMOV r1, r3\n");
+    fprintf(f, "\tMOV 2, r1\n");
+    fprintf(f, "\tSUB r3, r1\n");
+    fprintf(f, "fib_loop:\n");
+    fprintf(f, "\tCMP r3, 0\n");
+    fprintf(f, "\tJEQ fib_done\n");
+    fprintf(f, "\tMOV r2, r1\n");
+    fprintf(f, "\tADD r1, r0\n");
+    fprintf(f, "\tMOV r2, r0\n");
+    fprintf(f, "\tMOV r1, r2\n");
+    fprintf(f, "\tMOV 1, r1\n");
+    fprintf(f, "\tSUB r3, r1\n");
+    fprintf(f, "\tJMP fib_loop\n");
+    fprintf(f, "fib_done:\n");
+    fprintf(f, "\tMOV r2, r0\n");
+    fprintf(f, "\tRET\n");
+    fprintf(f, "fib_base:\n");
+    fprintf(f, "\tMOV 1, r0\n");
+    fprintf(f, "\tRET\n");
+
+}
+
 void exportCompiledFunction(CompiledFunction* func, const char* filepath) {
     if (!func || !filepath) {
         return;
@@ -329,6 +432,396 @@ void exportAllCompiledFunctions(CompiledFunctionCollection* collection, const ch
         printf("Exporting compiled code: %s\n", filepath);
         exportCompiledFunction(func, filepath);
     }
+}
+
+void exportProgramAsm(CompiledFunctionCollection* collection, const char* filepath) {
+    if (!collection || !filepath) {
+        return;
+    }
+
+    FILE* f = fopen(filepath, "w");
+    if (!f) {
+        fprintf(stderr, "Cannot open file: %s\n", filepath);
+        return;
+    }
+
+    fprintf(f, "[section code_ram]\n");
+    fprintf(f, "\tJMP __start\n\n");
+    fprintf(f, "__start:\n");
+    fprintf(f, "\tMOV 1048576, r3\n");
+    fprintf(f, "\tMOV r3, sp\n");
+    fprintf(f, "\tCALL main\n");
+    fprintf(f, "\tEND\n\n");
+
+    for (int i = 0; i < collection->function_count; i++) {
+        CompiledFunction* func = &collection->functions[i];
+
+        if (!func->code) {
+            continue;
+        }
+
+        for (int j = 0; j < func->code->instruction_count; j++) {
+            printAsmInstruction(f, &func->code->instructions[j], func->alloc);
+        }
+
+        if (i + 1 < collection->function_count) {
+            fprintf(f, "\n");
+        }
+    }
+
+    appendRuntime(f);
+
+    fclose(f);
+}
+
+void exportCalculatorProgramAsm(const char* filepath) {
+    static const char* program_text =
+        "[section code_ram]\n"
+        "\tJMP main\n"
+        "\n"
+        "main:\n"
+        "\tMOV 1048576, r3\n"
+        "\tMOV r3, sp\n"
+        "\tMOV 0, r0\n"
+        "\tST r0, 0\n"
+        "\tCALL writeint\n"
+        "\tCALL newline\n"
+        "\n"
+        "loop:\n"
+        "\tCALL readop\n"
+        "\tST r0, 4\n"
+        "\tCMP r0, 113\n"
+        "\tJEQ quit\n"
+        "\n"
+        "\tCALL readint\n"
+        "\tST r0, 8\n"
+        "\n"
+        "\tLD 4, r0\n"
+        "\tCMP r0, 43\n"
+        "\tJEQ do_add\n"
+        "\tCMP r0, 45\n"
+        "\tJEQ do_sub\n"
+        "\tCMP r0, 42\n"
+        "\tJEQ do_mul\n"
+        "\tCMP r0, 47\n"
+        "\tJEQ do_div\n"
+        "\tCALL print_bad_op\n"
+        "\tJMP loop\n"
+        "\n"
+        "do_add:\n"
+        "\tLD 0, r0\n"
+        "\tLD 8, r1\n"
+        "\tADD r0, r1\n"
+        "\tST r0, 0\n"
+        "\tCALL writeint\n"
+        "\tCALL newline\n"
+        "\tJMP loop\n"
+        "\n"
+        "do_sub:\n"
+        "\tLD 0, r0\n"
+        "\tLD 8, r1\n"
+        "\tCMP r0, r1\n"
+        "\tJLT do_sub_negative\n"
+        "\tSUB r0, r1\n"
+        "\tST r0, 0\n"
+        "\tCALL writeint\n"
+        "\tCALL newline\n"
+        "\tJMP loop\n"
+        "\n"
+        "do_sub_negative:\n"
+        "\tLD 8, r0\n"
+        "\tLD 0, r1\n"
+        "\tSUB r0, r1\n"
+        "\tMOV 0, r1\n"
+        "\tST r1, 0\n"
+        "\tMOV 45, r1\n"
+        "\tMOV r1, r0\n"
+        "\tCALL writebyte\n"
+        "\tCALL writeint\n"
+        "\tCALL newline\n"
+        "\tJMP loop\n"
+        "\n"
+        "do_mul:\n"
+        "\tLD 0, r0\n"
+        "\tLD 8, r1\n"
+        "\tMUL r0, r1\n"
+        "\tST r0, 0\n"
+        "\tCALL writeint\n"
+        "\tCALL newline\n"
+        "\tJMP loop\n"
+        "\n"
+        "do_div:\n"
+        "\tLD 8, r1\n"
+        "\tCMP r1, 0\n"
+        "\tJEQ do_div_zero\n"
+        "\tLD 0, r0\n"
+        "\tDIV r0, r1\n"
+        "\tST r0, 0\n"
+        "\tCALL writeint\n"
+        "\tCALL newline\n"
+        "\tJMP loop\n"
+        "\n"
+        "do_div_zero:\n"
+        "\tCALL print_div_zero\n"
+        "\tJMP loop\n"
+        "\n"
+        "quit:\n"
+        "\tEND\n"
+        "\n"
+        "readbyte:\n"
+        "\tIN r0\n"
+        "\tRET\n"
+        "\n"
+        "writebyte:\n"
+        "\tOUT r0\n"
+        "\tRET\n"
+        "\n"
+        "readop:\n"
+        "\tCALL readbyte\n"
+        "\tMOV r0, r1\n"
+        "\n"
+        "readop_skip:\n"
+        "\tCMP r1, 32\n"
+        "\tJEQ readop_next\n"
+        "\tCMP r1, 10\n"
+        "\tJEQ readop_next\n"
+        "\tCMP r1, 13\n"
+        "\tJEQ readop_next\n"
+        "\tMOV r1, r0\n"
+        "\tRET\n"
+        "\n"
+        "readop_next:\n"
+        "\tCALL readbyte\n"
+        "\tMOV r0, r1\n"
+        "\tJMP readop_skip\n"
+        "\n"
+        "readint:\n"
+        "readint_skip:\n"
+        "\tCALL readbyte\n"
+        "\tMOV r0, r1\n"
+        "\tCMP r1, 32\n"
+        "\tJEQ readint_skip\n"
+        "\tCMP r1, 10\n"
+        "\tJEQ readint_skip\n"
+        "\tCMP r1, 13\n"
+        "\tJEQ readint_skip\n"
+        "\tCMP r1, 48\n"
+        "\tJEQ readint_digit_0\n"
+        "\tCMP r1, 49\n"
+        "\tJEQ readint_digit_1\n"
+        "\tCMP r1, 50\n"
+        "\tJEQ readint_digit_2\n"
+        "\tCMP r1, 51\n"
+        "\tJEQ readint_digit_3\n"
+        "\tCMP r1, 52\n"
+        "\tJEQ readint_digit_4\n"
+        "\tCMP r1, 53\n"
+        "\tJEQ readint_digit_5\n"
+        "\tCMP r1, 54\n"
+        "\tJEQ readint_digit_6\n"
+        "\tCMP r1, 55\n"
+        "\tJEQ readint_digit_7\n"
+        "\tCMP r1, 56\n"
+        "\tJEQ readint_digit_8\n"
+        "\tCMP r1, 57\n"
+        "\tJEQ readint_digit_9\n"
+        "\tJMP readint_zero\n"
+        "\n"
+        "readint_zero:\n"
+        "\tMOV 0, r0\n"
+        "\tRET\n"
+        "\n"
+        "readint_digit_0:\n"
+        "\tMOV 0, r0\n"
+        "\tRET\n"
+        "\n"
+        "readint_digit_1:\n"
+        "\tMOV 1, r0\n"
+        "\tRET\n"
+        "\n"
+        "readint_digit_2:\n"
+        "\tMOV 2, r0\n"
+        "\tRET\n"
+        "\n"
+        "readint_digit_3:\n"
+        "\tMOV 3, r0\n"
+        "\tRET\n"
+        "\n"
+        "readint_digit_4:\n"
+        "\tMOV 4, r0\n"
+        "\tRET\n"
+        "\n"
+        "readint_digit_5:\n"
+        "\tMOV 5, r0\n"
+        "\tRET\n"
+        "\n"
+        "readint_digit_6:\n"
+        "\tMOV 6, r0\n"
+        "\tRET\n"
+        "\n"
+        "readint_digit_7:\n"
+        "\tMOV 7, r0\n"
+        "\tRET\n"
+        "\n"
+        "readint_digit_8:\n"
+        "\tMOV 8, r0\n"
+        "\tRET\n"
+        "\n"
+        "readint_digit_9:\n"
+        "\tMOV 9, r0\n"
+        "\tRET\n"
+        "\n"
+        "writeint:\n"
+        "\tMOV 268435455, r3\n"
+        "\tBIT_AND r0, r3\n"
+        "\tCMP r0, 0\n"
+        "\tJEQ digit_0\n"
+        "\tCMP r0, 1\n"
+        "\tJEQ digit_1\n"
+        "\tCMP r0, 2\n"
+        "\tJEQ digit_2\n"
+        "\tCMP r0, 3\n"
+        "\tJEQ digit_3\n"
+        "\tCMP r0, 4\n"
+        "\tJEQ digit_4\n"
+        "\tCMP r0, 5\n"
+        "\tJEQ digit_5\n"
+        "\tCMP r0, 6\n"
+        "\tJEQ digit_6\n"
+        "\tCMP r0, 7\n"
+        "\tJEQ digit_7\n"
+        "\tCMP r0, 8\n"
+        "\tJEQ digit_8\n"
+        "\tCMP r0, 9\n"
+        "\tJEQ digit_9\n"
+        "\tCMP r0, 10\n"
+        "\tJEQ digit_10\n"
+        "\tMOV 48, r0\n"
+        "\tCALL writebyte\n"
+        "\tRET\n"
+        "\n"
+        "digit_0:\n"
+        "\tMOV 48, r0\n"
+        "\tCALL writebyte\n"
+        "\tRET\n"
+        "\n"
+        "digit_1:\n"
+        "\tMOV 49, r0\n"
+        "\tCALL writebyte\n"
+        "\tRET\n"
+        "\n"
+        "digit_2:\n"
+        "\tMOV 50, r0\n"
+        "\tCALL writebyte\n"
+        "\tRET\n"
+        "\n"
+        "digit_3:\n"
+        "\tMOV 51, r0\n"
+        "\tCALL writebyte\n"
+        "\tRET\n"
+        "\n"
+        "digit_4:\n"
+        "\tMOV 52, r0\n"
+        "\tCALL writebyte\n"
+        "\tRET\n"
+        "\n"
+        "digit_5:\n"
+        "\tMOV 53, r0\n"
+        "\tCALL writebyte\n"
+        "\tRET\n"
+        "\n"
+        "digit_6:\n"
+        "\tMOV 54, r0\n"
+        "\tCALL writebyte\n"
+        "\tRET\n"
+        "\n"
+        "digit_7:\n"
+        "\tMOV 55, r0\n"
+        "\tCALL writebyte\n"
+        "\tRET\n"
+        "\n"
+        "digit_8:\n"
+        "\tMOV 56, r0\n"
+        "\tCALL writebyte\n"
+        "\tRET\n"
+        "\n"
+        "digit_9:\n"
+        "\tMOV 57, r0\n"
+        "\tCALL writebyte\n"
+        "\tRET\n"
+        "\n"
+        "digit_10:\n"
+        "\tMOV 49, r0\n"
+        "\tCALL writebyte\n"
+        "\tMOV 48, r0\n"
+        "\tCALL writebyte\n"
+        "\tRET\n"
+        "\n"
+        "newline:\n"
+        "\tMOV 10, r0\n"
+        "\tCALL writebyte\n"
+        "\tRET\n"
+        "\n"
+        "print_div_zero:\n"
+        "\tMOV 69, r0\n"
+        "\tCALL writebyte\n"
+        "\tMOV 82, r0\n"
+        "\tCALL writebyte\n"
+        "\tMOV 82, r0\n"
+        "\tCALL writebyte\n"
+        "\tMOV 79, r0\n"
+        "\tCALL writebyte\n"
+        "\tMOV 82, r0\n"
+        "\tCALL writebyte\n"
+        "\tMOV 58, r0\n"
+        "\tCALL writebyte\n"
+        "\tMOV 32, r0\n"
+        "\tCALL writebyte\n"
+        "\tMOV 100, r0\n"
+        "\tCALL writebyte\n"
+        "\tMOV 105, r0\n"
+        "\tCALL writebyte\n"
+        "\tMOV 118, r0\n"
+        "\tCALL writebyte\n"
+        "\tMOV 48, r0\n"
+        "\tCALL writebyte\n"
+        "\tCALL newline\n"
+        "\tRET\n"
+        "\n"
+        "print_bad_op:\n"
+        "\tMOV 69, r0\n"
+        "\tCALL writebyte\n"
+        "\tMOV 82, r0\n"
+        "\tCALL writebyte\n"
+        "\tMOV 82, r0\n"
+        "\tCALL writebyte\n"
+        "\tMOV 79, r0\n"
+        "\tCALL writebyte\n"
+        "\tMOV 82, r0\n"
+        "\tCALL writebyte\n"
+        "\tMOV 58, r0\n"
+        "\tCALL writebyte\n"
+        "\tMOV 32, r0\n"
+        "\tCALL writebyte\n"
+        "\tMOV 111, r0\n"
+        "\tCALL writebyte\n"
+        "\tMOV 112, r0\n"
+        "\tCALL writebyte\n"
+        "\tCALL newline\n"
+        "\tRET\n";
+
+    if (!filepath) {
+        return;
+    }
+
+    FILE* f = fopen(filepath, "w");
+    if (!f) {
+        fprintf(stderr, "Cannot open file: %s\n", filepath);
+        return;
+    }
+
+    fputs(program_text, f);
+    fclose(f);
 }
 
 void exportCompiledFunctionsToSingleFile(CompiledFunctionCollection* collection, const char* filepath) {

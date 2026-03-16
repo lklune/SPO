@@ -1,0 +1,40 @@
+def main()
+    int acc;
+    byte op;
+    byte digit;
+    int operand;
+
+    acc = 0;
+    writeInt(acc);
+    writeByte(10);
+    op = readOp();
+
+    while op != 113
+        digit = readDigit();
+        operand = digit - 48;
+
+        if op == 43 than
+        {
+            acc = acc + operand;
+        }
+
+        if op == 45 than
+        {
+            acc = acc - operand;
+        }
+
+        if op == 42 than
+        {
+            acc = acc * operand;
+        }
+
+        if op == 102 than
+        {
+            acc = fib(operand);
+        }
+
+        writeInt(acc);
+        writeByte(10);
+        op = readOp();
+    end
+end
