@@ -185,6 +185,9 @@
 "*"                                 {
  return STAR;
  }
+"/"                                 {
+ return SLASH;
+ }
 "("                                 {
  return LPAREN;
  }
