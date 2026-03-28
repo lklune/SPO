@@ -4,6 +4,7 @@ CFLAGS = -Wall -Wextra -g -Iinclude -Iparser
 LDFLAGS = -lm
 BISON = bison
 FLEX = flex
+TT = /mnt/c/Users/december/Desktop/SPO/260321/SPO/LK/RemoteTasks/Portable.RemoteTasks.Manager.exe -ul 472626 -up a72ac3ca-c226-422f-bcbe-a2b70133fd16
 
 BIN_DIR = bin
 OBJ_DIR = obj
@@ -81,4 +82,11 @@ run: $(BIN_DIR)/run_compiler | $(GEN_DIR)
 	./$(BIN_DIR)/run_compiler -o $(GEN_DIR) input.txt
 	./$(BIN_DIR)/run_compiler -o $(GEN_DIR) calc.src
 
-.PHONY: all clean run
+vm-run: $(BIN_DIR)/run_compiler | $(GEN_DIR)
+	./$(BIN_DIR)/run_compiler -o $(GEN_DIR) calc.src
+	id="$$( $(TT) -ws -w -id -s Assemble asmListing $(GEN_DIR)/program.asm definitionFile vm.target.pdsl archName vm | head -n 1 )"; \
+	$(TT) -ws -g "$$id" -r stdout.txt; \
+	$(TT) -ws -g "$$id" -r out.ptptb -o out.ptptb; \
+	$(TT) -ws -il -s ExecuteBinaryWithInteractiveInput definitionFile vm.target.pdsl stdinRegStName sin stdoutRegStName sout archName vm binaryFileToRun out.ptptb ipRegStorageName ipst finishMnemonicName END codeRamBankName code_ram
+
+.PHONY: all clean run vm-run
