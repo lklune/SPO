@@ -25,6 +25,8 @@ loop:
 	JEQ do_sub
 	CMP r0, 42
 	JEQ do_mul
+	CMP r0, 102
+	JEQ do_fib
 	CMP r0, 47
 	JEQ do_div
 	CALL print_bad_op
@@ -67,6 +69,14 @@ do_mul:
 	LD 0, r0
 	LD 8, r1
 	MUL r0, r1
+	ST r0, 0
+	CALL writeint
+	CALL newline
+	JMP loop
+
+do_fib:
+	LD 8, r0
+	CALL fib
 	ST r0, 0
 	CALL writeint
 	CALL newline
@@ -127,6 +137,8 @@ readint_skip:
 	JEQ readint_skip
 	CMP r1, 13
 	JEQ readint_skip
+	MOV 0, r2
+readint_loop:
 	CMP r1, 48
 	JEQ readint_digit_0
 	CMP r1, 49
@@ -147,79 +159,121 @@ readint_skip:
 	JEQ readint_digit_8
 	CMP r1, 57
 	JEQ readint_digit_9
-	JMP readint_zero
-
-readint_zero:
-	MOV 0, r0
-	RET
+	JMP readint_done
 
 readint_digit_0:
-	MOV 0, r0
-	RET
+	MOV r2, r0
+	MOV 10, r3
+	MUL r0, r3
+	MOV r0, r2
+	JMP readint_next
 
 readint_digit_1:
+	MOV r2, r0
+	MOV 10, r3
+	MUL r0, r3
+	MOV r0, r2
 	MOV 1, r0
-	RET
+	ADD r2, r0
+	JMP readint_next
 
 readint_digit_2:
+	MOV r2, r0
+	MOV 10, r3
+	MUL r0, r3
+	MOV r0, r2
 	MOV 2, r0
-	RET
+	ADD r2, r0
+	JMP readint_next
 
 readint_digit_3:
+	MOV r2, r0
+	MOV 10, r3
+	MUL r0, r3
+	MOV r0, r2
 	MOV 3, r0
-	RET
+	ADD r2, r0
+	JMP readint_next
 
 readint_digit_4:
+	MOV r2, r0
+	MOV 10, r3
+	MUL r0, r3
+	MOV r0, r2
 	MOV 4, r0
-	RET
+	ADD r2, r0
+	JMP readint_next
 
 readint_digit_5:
+	MOV r2, r0
+	MOV 10, r3
+	MUL r0, r3
+	MOV r0, r2
 	MOV 5, r0
-	RET
+	ADD r2, r0
+	JMP readint_next
 
 readint_digit_6:
+	MOV r2, r0
+	MOV 10, r3
+	MUL r0, r3
+	MOV r0, r2
 	MOV 6, r0
-	RET
+	ADD r2, r0
+	JMP readint_next
 
 readint_digit_7:
+	MOV r2, r0
+	MOV 10, r3
+	MUL r0, r3
+	MOV r0, r2
 	MOV 7, r0
-	RET
+	ADD r2, r0
+	JMP readint_next
 
 readint_digit_8:
+	MOV r2, r0
+	MOV 10, r3
+	MUL r0, r3
+	MOV r0, r2
 	MOV 8, r0
-	RET
+	ADD r2, r0
+	JMP readint_next
 
 readint_digit_9:
+	MOV r2, r0
+	MOV 10, r3
+	MUL r0, r3
+	MOV r0, r2
 	MOV 9, r0
+	ADD r2, r0
+readint_next:
+	CALL readbyte
+	MOV r0, r1
+	JMP readint_loop
+
+readint_done:
+	MOV r2, r0
 	RET
 
 writeint:
 	MOV 268435455, r3
 	BIT_AND r0, r3
-	CMP r0, 0
-	JEQ digit_0
-	CMP r0, 1
-	JEQ digit_1
-	CMP r0, 2
-	JEQ digit_2
-	CMP r0, 3
-	JEQ digit_3
-	CMP r0, 4
-	JEQ digit_4
-	CMP r0, 5
-	JEQ digit_5
-	CMP r0, 6
-	JEQ digit_6
-	CMP r0, 7
-	JEQ digit_7
-	CMP r0, 8
-	JEQ digit_8
-	CMP r0, 9
-	JEQ digit_9
-	CMP r0, 10
-	JEQ digit_10
-	MOV 48, r0
-	CALL writebyte
+	PUSH r0
+	MOV r0, r1
+	MOV 10, r2
+	DIV r1, r2
+	CMP r1, 0
+	JEQ writeint_ones
+	MOV r1, r0
+	CALL writeint
+writeint_ones:
+	POP r0
+	MOV r0, r1
+	MOV 10, r2
+	MOD r1, r2
+	MOV r1, r0
+	CALL write_digit
 	RET
 
 write_digit:
@@ -302,6 +356,34 @@ digit_10:
 	CALL writebyte
 	MOV 48, r0
 	CALL writebyte
+	RET
+
+fib:
+	MOV 268435455, r3
+	BIT_AND r0, r3
+	MOV r0, r1
+	CMP r1, 1
+	JEQ fib_base
+	CMP r1, 2
+	JEQ fib_base
+	PUSH r1
+	MOV r1, r0
+	MOV 2, r2
+	SUB r0, r2
+	CALL fib
+	POP r1
+	PUSH r0
+	MOV r1, r0
+	MOV 1, r2
+	SUB r0, r2
+	CALL fib
+	POP r1
+	ADD r1, r0
+	MOV r1, r0
+	RET
+
+fib_base:
+	MOV 1, r0
 	RET
 
 newline:

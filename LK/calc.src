@@ -13,7 +13,6 @@ end
 def main()
     int acc;
     byte op;
-    byte digit;
     int operand;
 
     acc = 0;
@@ -22,8 +21,7 @@ def main()
     op = readOp();
 
     while op != 113
-        digit = readDigit();
-        operand = digit - 48;
+        operand = readInt();
 
         if op == 43 than
         {
