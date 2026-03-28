@@ -2,6 +2,8 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -g -Iinclude -Iparser
 LDFLAGS = -lm
+BISON = bison
+FLEX = flex
 
 BIN_DIR = bin
 OBJ_DIR = obj
@@ -9,6 +11,11 @@ GEN_DIR = generated
 SRC_DIR = src
 INCLUDE_DIR = include
 PARSER_DIR = parser
+PARSER_SRC = $(PARSER_DIR)/parser.y
+LEXER_SRC = $(PARSER_DIR)/lexems.l
+PARSER_GEN_C = $(PARSER_DIR)/parser.tab.c
+PARSER_GEN_H = $(PARSER_DIR)/parser.tab.h
+LEXER_GEN_C = $(PARSER_DIR)/lex.yy.c
 
 COMPILER_OBJS = \
 	$(OBJ_DIR)/node.o \
@@ -49,10 +56,16 @@ $(OBJ_DIR)/export_cfg.o: $(SRC_DIR)/export_cfg.c $(INCLUDE_DIR)/export_cfg.h $(I
 $(OBJ_DIR)/export_code.o: $(SRC_DIR)/export_code.c $(INCLUDE_DIR)/export_code.h $(INCLUDE_DIR)/codegen.h | $(OBJ_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OBJ_DIR)/lex.yy.o: $(PARSER_DIR)/lex.yy.c $(INCLUDE_DIR)/error.h $(PARSER_DIR)/parser.tab.h | $(OBJ_DIR)
+$(PARSER_GEN_C) $(PARSER_GEN_H): $(PARSER_SRC)
+	$(BISON) -d $< -o $(PARSER_GEN_C)
+
+$(LEXER_GEN_C): $(LEXER_SRC) $(PARSER_GEN_H)
+	$(FLEX) -o $@ $<
+
+$(OBJ_DIR)/lex.yy.o: $(LEXER_GEN_C) $(INCLUDE_DIR)/error.h $(PARSER_GEN_H) | $(OBJ_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OBJ_DIR)/parser.tab.o: $(PARSER_DIR)/parser.tab.c $(PARSER_DIR)/parser.tab.h $(INCLUDE_DIR)/node.h $(INCLUDE_DIR)/error.h | $(OBJ_DIR)
+$(OBJ_DIR)/parser.tab.o: $(PARSER_GEN_C) $(PARSER_GEN_H) $(INCLUDE_DIR)/node.h $(INCLUDE_DIR)/error.h | $(OBJ_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BIN_DIR)/run_compiler: $(SRC_DIR)/main.c $(COMPILER_OBJS) | $(BIN_DIR)
@@ -62,8 +75,10 @@ $(BIN_DIR)/run_compiler: $(SRC_DIR)/main.c $(COMPILER_OBJS) | $(BIN_DIR)
 clean:
 	rm -f $(OBJ_DIR)/*.o $(TARGETS)
 	rm -rf $(GEN_DIR)
+	rm -f $(PARSER_GEN_C) $(PARSER_GEN_H) $(LEXER_GEN_C)
 
 run: $(BIN_DIR)/run_compiler | $(GEN_DIR)
 	./$(BIN_DIR)/run_compiler -o $(GEN_DIR) input.txt
+	./$(BIN_DIR)/run_compiler -o $(GEN_DIR) calc.src
 
 .PHONY: all clean run

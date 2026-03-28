@@ -7,11 +7,10 @@ make clean
 make run
 ./bin/run_compiler -o generated calc.src
 
-
-export id=$(tt -ws -w -id -s Assemble asmListing generated/program.asm definitionFile vm.target.pdsl archName vm)
+export id=$(tt -ws -w -id -s Assemble asmListing generated/program.asm definitionFile vm.target.pdsl archName vm | head -n 1)
 tt -ws -g "$id" -r stderr.txt
 tt -ws -g "$id" -r stdout.txt
-tt -ws -g "$id" -r out.ptptb > out.ptptb
+tt -ws -g "$id" -r out.ptptb -o out.ptptb
 tt -ws -il -s ExecuteBinaryWithInteractiveInput definitionFile vm.target.pdsl stdinRegStName sin stdoutRegStName sout archName vm binaryFileToRun out.ptptb ipRegStorageName ipst finishMnemonicName END codeRamBankName code_ram
 
 
