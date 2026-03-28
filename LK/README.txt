@@ -8,11 +8,11 @@ make run
 ./bin/run_compiler -o generated calc.src
 
 
-export id=$(tt -w -id -s Assemble asmListing generated/program.asm definitionFile vm.target.pdsl archName vm)
-tt -g "$id" -r stderr.txt
-tt -g "$id" -r stdout.txt
-tt -g "$id" -r out.ptptb > out.ptptb
-tt -il -s ExecuteBinaryWithInteractiveInput definitionFile vm.target.pdsl stdinRegStName sin stdoutRegStName sout archName vm binaryFileToRun out.ptptb ipRegStorageName ipst finishMnemonicName END codeRamBankName code_ram
+export id=$(tt -ws -w -id -s Assemble asmListing generated/program.asm definitionFile vm.target.pdsl archName vm)
+tt -ws -g "$id" -r stderr.txt
+tt -ws -g "$id" -r stdout.txt
+tt -ws -g "$id" -r out.ptptb > out.ptptb
+tt -ws -il -s ExecuteBinaryWithInteractiveInput definitionFile vm.target.pdsl stdinRegStName sin stdoutRegStName sout archName vm binaryFileToRun out.ptptb ipRegStorageName ipst finishMnemonicName END codeRamBankName code_ram
 
 
 После make run должны появляться:
@@ -25,7 +25,7 @@ dot -Tpng generated/input.main.dot -o generated/input.main.png
 
 RemoteTasks
 Алиас tt:
-alias tt="/mnt/c/Users/december/Desktop/SPO/lab1/LK/RemoteTasks/Portable.RemoteTasks.Manager.exe -ul 472626 -up a72ac3ca-c226-422f-bcbe-a2b70133fd16"
+alias tt="/mnt/c/Users/december/Desktop/SPO/260321/SPO/LK/RemoteTasks/Portable.RemoteTasks.Manager.exe -ul 472626 -up a72ac3ca-c226-422f-bcbe-a2b70133fd16"
 
 Параметры архитектуры:
 - stdinRegStName = sin
