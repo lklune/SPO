@@ -7,6 +7,7 @@ def fib(n of int)
     {
         r = fib(n - 2) + fib(n - 1);
     }
+    return r;
 end
 
 def main()
