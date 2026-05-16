@@ -1,4 +1,4 @@
-﻿#include <stdio.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "export_ast.h"
@@ -33,11 +33,48 @@ static void escape_json_string(FILE* f, const char* s) {
     fprintf(f, "\"");
 }
 
-static void nodeToJson(FILE* f, Node* node, int* counter) {
-    if (!node) return;
+static void escape_dot_string(FILE* f, const char* s) {
+    if (!s) {
+        return;
+    }
 
-    int id = (*counter)++;
-    const char* label = node->value ? node->value : (node->type ? node->type : "<node>");
+    for (const char* p = s; *p; p++) {
+        unsigned char c = (unsigned char)*p;
+
+        if (c == '"') {
+            fprintf(f, "\\\"");
+        }
+        else if (c == '\\') {
+            fprintf(f, "\\\\");
+        }
+        else if (c == '\n') {
+            fprintf(f, "\\n");
+        }
+        else if (c == '\r') {
+            fprintf(f, "\\r");
+        }
+        else if (c == '\t') {
+            fprintf(f, "\\t");
+        }
+        else if (c < 32) {
+            fputc('?', f);
+        }
+        else {
+            fputc(c, f);
+        }
+    }
+}
+
+static void nodeToJson(FILE* f, Node* node, int* counter) {
+    int id;
+    const char* label;
+
+    if (!node) {
+        return;
+    }
+
+    id = (*counter)++;
+    label = node->value ? node->value : (node->type ? node->type : "<node>");
 
     fprintf(f, "{ \"id\": \"node%d\", \"name\": ", id);
     escape_json_string(f, label);
@@ -59,17 +96,92 @@ static void nodeToJson(FILE* f, Node* node, int* counter) {
     fprintf(f, "}");
 }
 
-void exportAstToJson(Node* root, const char* filename) {
-    if (!root) return;
+static int nodeToDot(FILE* f, Node* node, int* counter) {
+    int id;
+    const char* label;
 
-    FILE* f = fopen(filename, "w");
+    if (!node) {
+        return -1;
+    }
+
+    id = (*counter)++;
+    label = node->value ? node->value : (node->type ? node->type : "<node>");
+
+    fprintf(f, "  node%d [label=\"", id);
+    escape_dot_string(f, label);
+    fprintf(f, "\"];\n");
+
+    if (node->left) {
+        int left_id = nodeToDot(f, node->left, counter);
+        if (left_id >= 0) {
+            fprintf(f, "  node%d -> node%d;\n", id, left_id);
+        }
+    }
+
+    if (node->right) {
+        int right_id = nodeToDot(f, node->right, counter);
+        if (right_id >= 0) {
+            fprintf(f, "  node%d -> node%d;\n", id, right_id);
+        }
+    }
+
+    return id;
+}
+
+void exportAstToJson(Node* root, const char* filename) {
+    FILE* f;
+    int counter = 0;
+
+    if (!root || !filename) {
+        return;
+    }
+
+    f = fopen(filename, "w");
     if (!f) {
         fprintf(stderr, "Cannot open file %s\n", filename);
         return;
     }
 
-    int counter = 0;
     nodeToJson(f, root, &counter);
 
     fclose(f);
+}
+
+void exportAstToDot(Node* root, const char* filename) {
+    FILE* f;
+    int counter = 0;
+
+    if (!root || !filename) {
+        return;
+    }
+
+    f = fopen(filename, "w");
+    if (!f) {
+        fprintf(stderr, "Cannot open file %s\n", filename);
+        return;
+    }
+
+    fprintf(f, "digraph AST {\n");
+    fprintf(f, "  rankdir=TB;\n");
+    fprintf(f, "  node [shape=box, fontname=\"Courier\", fontsize=11];\n");
+    nodeToDot(f, root, &counter);
+    fprintf(f, "}\n");
+
+    fclose(f);
+}
+
+int exportAstDotToPng(const char* dot_filename, const char* png_filename) {
+    char command[4096];
+    int rc;
+
+    if (!dot_filename || !png_filename) {
+        return 0;
+    }
+
+    snprintf(command, sizeof(command),
+        "dot -Tpng \"%s\" -o \"%s\"",
+        dot_filename, png_filename);
+
+    rc = system(command);
+    return rc == 0 ? 1 : 0;
 }

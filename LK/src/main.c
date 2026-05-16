@@ -153,13 +153,27 @@ int main(int argc, char* argv[]) {
 
         /* Экспорт AST в JSON */
         char ast_path[1024];
+        char ast_dot_path[1024];
+        char ast_png_path[1024];
         char bname[256], dname[256];
         basename_noext(fname, bname, sizeof(bname));
         dirname_of(fname, dname, sizeof(dname));
         snprintf(ast_path, sizeof(ast_path), "%s/%s.ast.json",
             outdir ? outdir : dname, bname);
+        snprintf(ast_dot_path, sizeof(ast_dot_path), "%s/%s.ast.dot",
+            outdir ? outdir : dname, bname);
+        snprintf(ast_png_path, sizeof(ast_png_path), "%s/%s.ast.png",
+            outdir ? outdir : dname, bname);
         exportAstToJson(root, ast_path);
+        exportAstToDot(root, ast_dot_path);
         printf("  AST saved: %s\n", ast_path);
+        printf("  AST dot saved: %s\n", ast_dot_path);
+        if (exportAstDotToPng(ast_dot_path, ast_png_path)) {
+            printf("  AST png saved: %s\n", ast_png_path);
+        }
+        else {
+            fprintf(stderr, "AST png was not created for %s. Check Graphviz dot.\n", fname);
+        }
 
         addFileToCollection(file_col, fname, root);
     }

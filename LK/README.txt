@@ -19,6 +19,7 @@
 -- make
 -- bison
 -- flex
+-- graphviz dot для автоматического AST png
 
 
 Сборка
@@ -43,12 +44,14 @@ make run-calc       -- компиляция calc.src и сохранение р�
 make vm-run         -- запуск калькулятора на VM
 
 
+AST и картинки
+После запуска компилятора автоматически создаются:
+-- *.ast.json
+-- *.ast.dot
+-- *.ast.png если установлен graphviz dot
+
 dot:
 dot -Tpng generated/call_graph.dot -o generated/call_graph.png
-
-AST-дерево
-python3 tools/json_to_dot.py generated/test_basic/types_basic.ast.json generated/test_basic/types_basic.ast.dot
-dot -Tpng generated/test_basic/types_basic.ast.dot -o generated/test_basic/types_basic.ast.png
 
 
 
