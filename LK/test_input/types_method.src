@@ -1,0 +1,15 @@
+type Counter begin
+    int value;
+
+    def ping() of int
+        int r;
+        r = 123;
+    end
+end
+
+def main()
+    Counter c;
+    int x;
+
+    x = c.ping();
+end

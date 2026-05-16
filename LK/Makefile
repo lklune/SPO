@@ -30,6 +30,7 @@ COMPILER_OBJS = \
 	$(OBJ_DIR)/parser.tab.o
 
 TARGETS = $(BIN_DIR)/run_compiler
+INPUT ?= input.txt
 
 all: $(TARGETS)
 
@@ -79,6 +80,9 @@ clean:
 	rm -f $(PARSER_GEN_C) $(PARSER_GEN_H) $(LEXER_GEN_C)
 
 run: $(BIN_DIR)/run_compiler | $(GEN_DIR)
+	./$(BIN_DIR)/run_compiler -o $(GEN_DIR) $(INPUT)
+
+run-all: $(BIN_DIR)/run_compiler | $(GEN_DIR)
 	./$(BIN_DIR)/run_compiler -o $(GEN_DIR) input.txt
 	./$(BIN_DIR)/run_compiler -o $(GEN_DIR) calc.src
 
@@ -89,4 +93,4 @@ vm-run: $(BIN_DIR)/run_compiler | $(GEN_DIR)
 	$(TT) -ws -g "$$id" -r out.ptptb -o out.ptptb; \
 	$(TT) -ws -il -s ExecuteBinaryWithInteractiveInput definitionFile vm.target.pdsl stdinRegStName sin stdoutRegStName sout archName vm binaryFileToRun out.ptptb ipRegStorageName ipst finishMnemonicName END codeRamBankName code_ram
 
-.PHONY: all clean run vm-run
+.PHONY: all clean run run-all vm-run

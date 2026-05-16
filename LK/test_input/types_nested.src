@@ -1,0 +1,18 @@
+type Point begin
+    int x;
+    int y;
+end
+
+type Line begin
+    Point start;
+    Point finish;
+end
+
+def main()
+    Line l;
+    int r;
+
+    l.start.x = 7;
+    l.finish.y = 9;
+    r = l.start.x;
+end

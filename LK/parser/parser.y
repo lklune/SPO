@@ -34,6 +34,7 @@ void yyerror(const char *s);  // �������� ������� 
 %token <node> LPAREN RPAREN LBRACE RBRACE LBRACKET RBRACKET
 %token <node> TYPEDEF
 %token <node> ARRAY_COMMAS
+%token <node> TYPE DOT
 
 %right ASSIGN
 %left OR
@@ -46,12 +47,19 @@ void yyerror(const char *s);  // �������� ������� 
 %left SHIFT_LEFT SHIFT_RIGHT
 %left PLUS MINUS
 %left STAR SLASH PERCENT
+%left DOT
 %right BIT_NOT NOT
 
 %type <node> typeRef
 %type <node> funcSignature
 %type <node> argDef
 %type <node> sourceItem
+%type <node> typeDecl
+%type <node> optionalBaseType
+%type <node> typeMember
+%type <node> listTypeMember
+%type <node> fieldDecl
+%type <node> methodDecl
 %type <node> listSourceItem
 %type <node> statement
 %type <node> var
@@ -76,6 +84,8 @@ void yyerror(const char *s);  // �������� ������� 
 %type <node> listExpr
 %type <node> optionalListExpr
 %type <node> call
+%type <node> memberAccess
+%type <node> methodCall
 %type <node> braces
 %type <node> unary
 %type <node> binary
@@ -98,11 +108,48 @@ sourceItem:
       DEF funcSignature listStatement END { 
           $$ = createNode("sourceItem", $2, $3, NULL); 
       }
+    | typeDecl { $$ = $1; }
     ;
 
 listSourceItem: 
       sourceItem listSourceItem { $$ = createNode("listSourceItem", $1, $2, NULL); }
     | { $$ = NULL; }
+    ;
+
+typeDecl:
+      TYPE IDENTIFIER optionalBaseType BEGIN_BLOCK listTypeMember END {
+          $$ = createNode("typeDecl", createNode("typeHeader", $3, NULL, $2 ? $2->value : NULL), $5, NULL);
+      }
+    | TYPE IDENTIFIER optionalBaseType LBRACE listTypeMember RBRACE {
+          $$ = createNode("typeDecl", createNode("typeHeader", $3, NULL, $2 ? $2->value : NULL), $5, NULL);
+      }
+    ;
+
+optionalBaseType:
+      { $$ = NULL; }
+    | OF IDENTIFIER { $$ = $2; }
+    ;
+
+listTypeMember:
+      typeMember listTypeMember { $$ = createNode("listTypeMember", $1, $2, NULL); }
+    | { $$ = NULL; }
+    ;
+
+typeMember:
+      fieldDecl { $$ = $1; }
+    | methodDecl { $$ = $1; }
+    ;
+
+fieldDecl:
+      typeRef IDENTIFIER SEMICOLON {
+          $$ = createNode("fieldDecl", $1, NULL, $2 ? $2->value : NULL);
+      }
+    ;
+
+methodDecl:
+      DEF funcSignature listStatement END {
+          $$ = createNode("methodDecl", $2, $3, NULL);
+      }
     ;
 
 /* FuncSignature */
@@ -205,6 +252,8 @@ expr: unary { $$ = $1; }
     | binary { $$ = $1; }
     | braces { $$ = $1; }
     | call { $$ = $1; }
+    | methodCall { $$ = $1; }
+    | memberAccess { $$ = $1; }
     | slice { $$ = $1; }
     | place { $$ = $1; }
     | literal { $$ = $1; }
@@ -234,6 +283,20 @@ unary: PLUS expr { $$ = createNode("PLUS", $2, NULL, NULL); }
 braces: LPAREN expr RPAREN { $$ = createNode("braces", $2, NULL, NULL); };
 
 call: IDENTIFIER LPAREN optionalListExpr RPAREN { $$ = createNode("CALL", $1, $3, NULL); };
+
+methodCall: place DOT IDENTIFIER LPAREN optionalListExpr RPAREN {
+        $$ = createNode("METHOD_CALL", $1, $5, $3 ? $3->value : NULL);
+    }
+    | memberAccess DOT IDENTIFIER LPAREN optionalListExpr RPAREN {
+        $$ = createNode("METHOD_CALL", $1, $5, $3 ? $3->value : NULL);
+    };
+
+memberAccess: place DOT IDENTIFIER {
+        $$ = createNode("memberAccess", $1, NULL, $3 ? $3->value : NULL);
+    }
+    | memberAccess DOT IDENTIFIER {
+        $$ = createNode("memberAccess", $1, NULL, $3 ? $3->value : NULL);
+    };
 
 optionalListExpr: listExpr { $$ = createNode("optionalListExpr", $1, NULL, NULL); }
     | { $$ = createNode("optionalListExpr", NULL, NULL, NULL); };
@@ -270,4 +333,3 @@ listVarDeclaredItem: IDENTIFIER { $$ = $1; }
 var: typeRef listVarDeclared SEMICOLON { $$ = createNode("var", $1, $2, NULL); };
 
 %%
-

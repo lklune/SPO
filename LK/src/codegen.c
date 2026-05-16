@@ -5,6 +5,7 @@
 #include <string.h>
 
 static int g_label_counter = 0;
+static Function* g_current_function = NULL;
 
 static void make_auto_label(char* buf, size_t size, const char* prefix) {
     snprintf(buf, size, "%s_%d", prefix, g_label_counter++);
@@ -68,37 +69,44 @@ void addInstruction(LinearCode* code, InstructionType type, Operand op1, Operand
     }
 
     if (code->instruction_count >= code->max_instructions) {
+        Instruction* resized;
         code->max_instructions *= 2;
-        Instruction* resized = (Instruction*)realloc(code->instructions,
-                                                     (size_t)code->max_instructions * sizeof(Instruction));
+        resized = (Instruction*)realloc(code->instructions,
+            (size_t)code->max_instructions * sizeof(Instruction));
         if (!resized) {
             return;
         }
         code->instructions = resized;
     }
 
-    Instruction* instr = &code->instructions[code->instruction_count++];
-    instr->type = type;
-    instr->operand1 = op1;
-    instr->operand2 = op2;
-    instr->line_number = 0;
+    code->instructions[code->instruction_count].type = type;
+    code->instructions[code->instruction_count].operand1 = op1;
+    code->instructions[code->instruction_count].operand2 = op2;
+    code->instructions[code->instruction_count].line_number = 0;
+    code->instruction_count++;
 }
 
 void freeLinearCode(LinearCode* code) {
+    int i;
+
     if (!code) {
         return;
     }
 
-    for (int i = 0; i < code->instruction_count; ++i) {
+    for (i = 0; i < code->instruction_count; ++i) {
         Instruction* instr = &code->instructions[i];
 
-        if ((instr->operand1.type == OPERAND_VARIABLE || instr->operand1.type == OPERAND_LABEL ||
-             instr->operand1.type == OPERAND_STRING) && instr->operand1.value.name) {
+        if ((instr->operand1.type == OPERAND_VARIABLE ||
+            instr->operand1.type == OPERAND_LABEL ||
+            instr->operand1.type == OPERAND_STRING) &&
+            instr->operand1.value.name) {
             free(instr->operand1.value.name);
         }
 
-        if ((instr->operand2.type == OPERAND_VARIABLE || instr->operand2.type == OPERAND_LABEL ||
-             instr->operand2.type == OPERAND_STRING) && instr->operand2.value.name) {
+        if ((instr->operand2.type == OPERAND_VARIABLE ||
+            instr->operand2.type == OPERAND_LABEL ||
+            instr->operand2.type == OPERAND_STRING) &&
+            instr->operand2.value.name) {
             free(instr->operand2.value.name);
         }
     }
@@ -141,45 +149,73 @@ void freeRegister(RegisterAllocator* alloc, int reg) {
 }
 
 int allocateMemory(RegisterAllocator* alloc) {
-    if (!alloc || alloc->next_memory_addr + 4 > alloc->max_memory) {
+    return allocateMemorySize(alloc, 4);
+}
+
+int allocateMemorySize(RegisterAllocator* alloc, int size_bytes) {
+    int aligned_size;
+    int addr;
+
+    if (!alloc) {
         return -1;
     }
 
-    int addr = alloc->next_memory_addr;
-    alloc->next_memory_addr += 4;
+    aligned_size = size_bytes <= 0 ? 4 : size_bytes;
+    if (aligned_size % 4 != 0) {
+        aligned_size += 4 - (aligned_size % 4);
+    }
+
+    if (alloc->next_memory_addr + aligned_size > alloc->max_memory) {
+        return -1;
+    }
+
+    addr = alloc->next_memory_addr;
+    alloc->next_memory_addr += aligned_size;
     return addr;
 }
 
-void bindVariable(RegisterAllocator* alloc, const char* var_name, int register_id, int memory_address) {
+void bindVariable(RegisterAllocator* alloc, const char* var_name,
+    const char* type_name, int register_id, int memory_address,
+    int size_bytes, int is_argument, int is_user_type) {
+    VariableBinding* binding;
+
     if (!alloc || !var_name) {
         return;
     }
 
     if (alloc->binding_count >= alloc->max_bindings) {
+        VariableBinding* resized;
         alloc->max_bindings *= 2;
-        VariableBinding* resized =
-            (VariableBinding*)realloc(alloc->bindings, (size_t)alloc->max_bindings * sizeof(VariableBinding));
+        resized = (VariableBinding*)realloc(alloc->bindings,
+            (size_t)alloc->max_bindings * sizeof(VariableBinding));
         if (!resized) {
             return;
         }
         alloc->bindings = resized;
     }
 
-    VariableBinding* binding = &alloc->bindings[alloc->binding_count++];
+    binding = &alloc->bindings[alloc->binding_count++];
     binding->var_name = strdup(var_name);
+    binding->type_name = type_name ? strdup(type_name) : NULL;
     binding->register_id = register_id;
     binding->memory_address = memory_address;
+    binding->size_bytes = size_bytes > 0 ? size_bytes : 4;
+    binding->is_argument = is_argument;
+    binding->is_user_type = is_user_type;
     binding->is_constant = 0;
     binding->constant_value = 0;
 }
 
 VariableBinding* findVariableBinding(RegisterAllocator* alloc, const char* var_name) {
+    int i;
+
     if (!alloc || !var_name) {
         return NULL;
     }
 
-    for (int i = 0; i < alloc->binding_count; ++i) {
-        if (alloc->bindings[i].var_name && strcmp(alloc->bindings[i].var_name, var_name) == 0) {
+    for (i = 0; i < alloc->binding_count; ++i) {
+        if (alloc->bindings[i].var_name &&
+            strcmp(alloc->bindings[i].var_name, var_name) == 0) {
             return &alloc->bindings[i];
         }
     }
@@ -188,12 +224,15 @@ VariableBinding* findVariableBinding(RegisterAllocator* alloc, const char* var_n
 }
 
 void freeRegisterAllocator(RegisterAllocator* alloc) {
+    int i;
+
     if (!alloc) {
         return;
     }
 
-    for (int i = 0; i < alloc->binding_count; ++i) {
+    for (i = 0; i < alloc->binding_count; ++i) {
         free(alloc->bindings[i].var_name);
+        free(alloc->bindings[i].type_name);
     }
 
     free(alloc->bindings);
@@ -206,8 +245,12 @@ static int is_leaf_identifier(const Operation* op) {
 
 static int is_leaf_literal(const Operation* op) {
     return op && op->op_type &&
-           (strcmp(op->op_type, "DEC") == 0 || strcmp(op->op_type, "HEX") == 0 || strcmp(op->op_type, "BIN") == 0 ||
-            strcmp(op->op_type, "TRUE") == 0 || strcmp(op->op_type, "FALSE") == 0 || strcmp(op->op_type, "CHAR") == 0);
+        (strcmp(op->op_type, "DEC") == 0 ||
+            strcmp(op->op_type, "HEX") == 0 ||
+            strcmp(op->op_type, "BIN") == 0 ||
+            strcmp(op->op_type, "TRUE") == 0 ||
+            strcmp(op->op_type, "FALSE") == 0 ||
+            strcmp(op->op_type, "CHAR") == 0);
 }
 
 static long parse_literal_value(const Operation* op) {
@@ -232,15 +275,233 @@ static long parse_literal_value(const Operation* op) {
     return strtol(op->value, NULL, 10);
 }
 
+static const char* current_type_name_for_variable(const char* name) {
+    FunctionArg* arg;
+
+    if (!g_current_function || !g_current_function->signature || !name) {
+        return NULL;
+    }
+
+    arg = g_current_function->signature->args;
+    while (arg) {
+        if (arg->name && strcmp(arg->name, name) == 0) {
+            return arg->type;
+        }
+        arg = arg->next;
+    }
+
+    return NULL;
+}
+
+static int is_user_type_name(const char* type_name) {
+    return type_name && !isBuiltinTypeName(type_name) &&
+        strncmp(type_name, "array(", 6) != 0;
+}
+
 static void ensure_variable_binding(RegisterAllocator* alloc, const char* name) {
+    const char* inferred_type;
+    int size_bytes;
+
     if (!alloc || !name || !*name) {
         return;
     }
 
-    if (!findVariableBinding(alloc, name)) {
-        int mem_addr = allocateMemory(alloc);
-        bindVariable(alloc, name, -1, mem_addr);
+    if (findVariableBinding(alloc, name)) {
+        return;
     }
+
+    inferred_type = current_type_name_for_variable(name);
+    size_bytes = getTypeStorageSize(g_current_function ? g_current_function->types : NULL,
+        inferred_type);
+    bindVariable(alloc, name, inferred_type, -1,
+        allocateMemorySize(alloc, size_bytes), size_bytes,
+        0, is_user_type_name(inferred_type));
+}
+
+static void ensure_variable_binding_with_type(RegisterAllocator* alloc, const char* name,
+    const char* type_name, int is_argument) {
+    VariableBinding* binding;
+    int size_bytes;
+
+    if (!alloc || !name || !*name) {
+        return;
+    }
+
+    binding = findVariableBinding(alloc, name);
+    size_bytes = getTypeStorageSize(g_current_function ? g_current_function->types : NULL,
+        type_name);
+
+    if (binding) {
+        if (!binding->type_name && type_name) {
+            binding->type_name = strdup(type_name);
+            binding->size_bytes = size_bytes;
+            binding->is_user_type = is_user_type_name(type_name);
+        }
+        if (is_argument) {
+            binding->is_argument = 1;
+        }
+        return;
+    }
+
+    bindVariable(alloc, name, type_name, -1,
+        allocateMemorySize(alloc, size_bytes), size_bytes,
+        is_argument, is_user_type_name(type_name));
+}
+
+static int resolve_member_address(RegisterAllocator* alloc, Operation* op,
+    const char** out_type_name) {
+    const char* path[32];
+    int path_count = 0;
+    Operation* current = op;
+    VariableBinding* base_binding;
+    const char* current_type;
+    int address;
+    int i;
+
+    while (current && current->op_type &&
+        strcmp(current->op_type, "memberAccess") == 0 &&
+        path_count < 32) {
+        path[path_count++] = current->value;
+        current = current->left;
+    }
+
+    if (!current || !is_leaf_identifier(current) || !current->value) {
+        return -1;
+    }
+
+    base_binding = findVariableBinding(alloc, current->value);
+    if (!base_binding) {
+        ensure_variable_binding(alloc, current->value);
+        base_binding = findVariableBinding(alloc, current->value);
+    }
+
+    if (!base_binding || !base_binding->type_name) {
+        return -1;
+    }
+
+    current_type = base_binding->type_name;
+    address = base_binding->memory_address;
+
+    for (i = path_count - 1; i >= 0; --i) {
+        UserTypeField* field = findUserTypeField(
+            g_current_function ? g_current_function->types : NULL,
+            current_type, path[i]);
+        if (!field) {
+            return -1;
+        }
+        address += field->offset;
+        current_type = field->type_name;
+    }
+
+    if (out_type_name) {
+        *out_type_name = current_type;
+    }
+
+    return address;
+}
+
+static char* type_name_from_operation(Operation* op) {
+    char buffer[256];
+    char* element_name;
+
+    if (!op) return strdup("?");
+
+    if ((strcmp(op->op_type, "IDENTIFIER") == 0 ||
+        strcmp(op->op_type, "TYPEDEF") == 0) &&
+        op->value) {
+        return strdup(op->value);
+    }
+
+    if (strcmp(op->op_type, "array") == 0) {
+        element_name = type_name_from_operation(op->left);
+        snprintf(buffer, sizeof(buffer), "array(%s,%s)",
+            element_name ? element_name : "?",
+            op->value ? op->value : "1");
+        free(element_name);
+        return strdup(buffer);
+    }
+
+    if (op->value) {
+        return strdup(op->value);
+    }
+
+    return strdup(op->op_type ? op->op_type : "?");
+}
+
+static const char* resolve_expression_type(RegisterAllocator* alloc, Operation* op) {
+    VariableBinding* binding;
+    const char* field_type = NULL;
+
+    if (!op) {
+        return NULL;
+    }
+
+    if (is_leaf_identifier(op)) {
+        binding = findVariableBinding(alloc, op->value);
+        if (!binding) {
+            ensure_variable_binding(alloc, op->value);
+            binding = findVariableBinding(alloc, op->value);
+        }
+        return binding ? binding->type_name : NULL;
+    }
+
+    if (strcmp(op->op_type, "memberAccess") == 0) {
+        resolve_member_address(alloc, op, &field_type);
+        return field_type;
+    }
+
+    return NULL;
+}
+
+static char* member_binding_name_from_operation(Operation* op) {
+    char buffer[256];
+    Operation* chain[32];
+    int chain_len = 0;
+    Operation* current = op;
+    int used;
+    int i;
+
+    while (current && current->op_type &&
+        strcmp(current->op_type, "memberAccess") == 0 &&
+        chain_len < 32) {
+        chain[chain_len++] = current;
+        current = current->left;
+    }
+
+    if (!current || !is_leaf_identifier(current) || !current->value) {
+        return NULL;
+    }
+
+    used = snprintf(buffer, sizeof(buffer), "%s", current->value);
+    for (i = chain_len - 1; i >= 0 && used < (int)sizeof(buffer); --i) {
+        used += snprintf(buffer + used, sizeof(buffer) - (size_t)used,
+            ".%s", chain[i]->value ? chain[i]->value : "?");
+    }
+
+    return strdup(buffer);
+}
+
+static char* ensure_member_binding(RegisterAllocator* alloc, Operation* op) {
+    const char* member_type = NULL;
+    int member_address;
+    char* binding_name;
+
+    member_address = resolve_member_address(alloc, op, &member_type);
+    if (member_address < 0) {
+        return NULL;
+    }
+
+    binding_name = member_binding_name_from_operation(op);
+    if (!binding_name) {
+        return NULL;
+    }
+
+    if (!findVariableBinding(alloc, binding_name)) {
+        bindVariable(alloc, binding_name, member_type, -1,
+            member_address, 4, 0, is_user_type_name(member_type));
+    }
+
+    return binding_name;
 }
 
 static void emit_expression(LinearCode* code, RegisterAllocator* alloc, Operation* op, int target_reg);
@@ -264,9 +525,12 @@ static InstructionType map_binary_instr(const char* op_type) {
 
 static int is_compare_op(const char* op_type) {
     if (!op_type) return 0;
-    return strcmp(op_type, "EQUALITY") == 0 || strcmp(op_type, "NOTEQUAL") == 0 || strcmp(op_type, "LESSTHAN") == 0 ||
-           strcmp(op_type, "GREATERTHAN") == 0 || strcmp(op_type, "LESSTHANEQ") == 0 ||
-           strcmp(op_type, "GREATERTHANEQ") == 0;
+    return strcmp(op_type, "EQUALITY") == 0 ||
+        strcmp(op_type, "NOTEQUAL") == 0 ||
+        strcmp(op_type, "LESSTHAN") == 0 ||
+        strcmp(op_type, "GREATERTHAN") == 0 ||
+        strcmp(op_type, "LESSTHANEQ") == 0 ||
+        strcmp(op_type, "GREATERTHANEQ") == 0;
 }
 
 static InstructionType jump_for_compare(const char* op_type) {
@@ -282,6 +546,7 @@ static InstructionType jump_for_compare(const char* op_type) {
 static void emit_compare_to_bool(LinearCode* code, const char* compare_op, int target_reg) {
     char true_lbl[64];
     char end_lbl[64];
+
     make_auto_label(true_lbl, sizeof(true_lbl), "cmp_true");
     make_auto_label(end_lbl, sizeof(end_lbl), "cmp_end");
 
@@ -294,8 +559,9 @@ static void emit_compare_to_bool(LinearCode* code, const char* compare_op, int t
 }
 
 static void emit_call(LinearCode* code, RegisterAllocator* alloc, Operation* op, int target_reg) {
-    if (op && op->right && strcmp(op->right->op_type, "optionalListExpr") == 0 && op->right->left &&
-        strcmp(op->right->left->op_type, "listExpr") == 0 && op->right->left->left) {
+    if (op && op->right && strcmp(op->right->op_type, "optionalListExpr") == 0 &&
+        op->right->left && strcmp(op->right->left->op_type, "listExpr") == 0 &&
+        op->right->left->left) {
         emit_expression(code, alloc, op->right->left->left, 0);
     }
 
@@ -308,7 +574,41 @@ static void emit_call(LinearCode* code, RegisterAllocator* alloc, Operation* op,
     }
 }
 
+static void emit_method_call(LinearCode* code, RegisterAllocator* alloc, Operation* op, int target_reg) {
+    const char* object_type;
+    UserTypeMethod* method;
+
+    if (!op || !op->value) {
+        return;
+    }
+
+    object_type = resolve_expression_type(alloc, op->left);
+    method = findUserTypeMethod(g_current_function ? g_current_function->types : NULL,
+        object_type, op->value);
+
+    if (op->right && strcmp(op->right->op_type, "optionalListExpr") == 0 &&
+        op->right->left && strcmp(op->right->left->op_type, "listExpr") == 0 &&
+        op->right->left->left) {
+        emit_expression(code, alloc, op->right->left->left, 0);
+    }
+
+    if (method && method->full_name) {
+        addInstruction(code, INSTR_CALL, createLabelOperand(method->full_name), createConstantOperand(0));
+    }
+    else {
+        addInstruction(code, INSTR_CALL, createLabelOperand(op->value), createConstantOperand(0));
+    }
+
+    if (target_reg != 0) {
+        addInstruction(code, INSTR_MOV, createRegisterOperand(target_reg), createRegisterOperand(0));
+    }
+}
+
 static void emit_expression(LinearCode* code, RegisterAllocator* alloc, Operation* op, int target_reg) {
+    char* member_binding_name;
+    int temp_reg;
+    InstructionType instr;
+
     if (!code) {
         return;
     }
@@ -345,6 +645,20 @@ static void emit_expression(LinearCode* code, RegisterAllocator* alloc, Operatio
         return;
     }
 
+    if (strcmp(op->op_type, "METHOD_CALL") == 0) {
+        emit_method_call(code, alloc, op, target_reg);
+        return;
+    }
+
+    if (strcmp(op->op_type, "memberAccess") == 0) {
+        member_binding_name = ensure_member_binding(alloc, op);
+        if (member_binding_name) {
+            addInstruction(code, INSTR_MOV, createRegisterOperand(target_reg), createVariableOperand(member_binding_name));
+            free(member_binding_name);
+            return;
+        }
+    }
+
     if (strcmp(op->op_type, "NOT") == 0 && op->right == NULL) {
         emit_expression(code, alloc, op->left, target_reg);
         addInstruction(code, INSTR_NOT, createRegisterOperand(target_reg), createConstantOperand(0));
@@ -364,10 +678,20 @@ static void emit_expression(LinearCode* code, RegisterAllocator* alloc, Operatio
             emit_expression(code, alloc, op->right, target_reg);
             addInstruction(code, INSTR_MOV, createVariableOperand(op->left->value), createRegisterOperand(target_reg));
         }
+        else if (op->left && op->left->op_type &&
+            strcmp(op->left->op_type, "memberAccess") == 0) {
+            emit_expression(code, alloc, op->right, target_reg);
+            member_binding_name = ensure_member_binding(alloc, op->left);
+            if (member_binding_name) {
+                addInstruction(code, INSTR_MOV, createVariableOperand(member_binding_name), createRegisterOperand(target_reg));
+                free(member_binding_name);
+            }
+        }
         return;
     }
 
-    if (strcmp(op->op_type, "IF_COND") == 0 || strcmp(op->op_type, "LOOP_COND") == 0 ||
+    if (strcmp(op->op_type, "IF_COND") == 0 ||
+        strcmp(op->op_type, "LOOP_COND") == 0 ||
         strcmp(op->op_type, "REPEAT_COND") == 0) {
         emit_expression(code, alloc, op->left, target_reg);
         addInstruction(code, INSTR_CMP, createRegisterOperand(target_reg), createConstantOperand(0));
@@ -378,7 +702,7 @@ static void emit_expression(LinearCode* code, RegisterAllocator* alloc, Operatio
         return;
     }
 
-    int temp_reg = (target_reg == 0) ? 1 : 0;
+    temp_reg = (target_reg == 0) ? 1 : 0;
     emit_expression(code, alloc, op->left, target_reg);
     addInstruction(code, INSTR_MOV, createRegisterOperand(temp_reg), createRegisterOperand(target_reg));
     emit_expression(code, alloc, op->right, target_reg);
@@ -389,7 +713,7 @@ static void emit_expression(LinearCode* code, RegisterAllocator* alloc, Operatio
         return;
     }
 
-    InstructionType instr = map_binary_instr(op->op_type);
+    instr = map_binary_instr(op->op_type);
     if (instr != INSTR_END) {
         addInstruction(code, instr, createRegisterOperand(temp_reg), createRegisterOperand(target_reg));
         addInstruction(code, INSTR_MOV, createRegisterOperand(target_reg), createRegisterOperand(temp_reg));
@@ -399,30 +723,39 @@ static void emit_expression(LinearCode* code, RegisterAllocator* alloc, Operatio
     addInstruction(code, INSTR_LOAD_CONST, createRegisterOperand(target_reg), createConstantOperand(0));
 }
 
-static void emit_var_decls(RegisterAllocator* alloc, Operation* node, LinearCode* code) {
+static void emit_var_decls(RegisterAllocator* alloc, Operation* type_op,
+    Operation* node, LinearCode* code) {
+    char* declared_type_name;
+
     if (!node) {
         return;
     }
 
     if (node->op_type && strcmp(node->op_type, "listVarDeclared") == 0) {
-        emit_var_decls(alloc, node->left, code);
-        emit_var_decls(alloc, node->right, code);
+        emit_var_decls(alloc, type_op, node->left, code);
+        emit_var_decls(alloc, type_op, node->right, code);
         return;
     }
+
+    declared_type_name = type_name_from_operation(type_op);
 
     if (is_leaf_identifier(node) && node->value) {
-        ensure_variable_binding(alloc, node->value);
+        ensure_variable_binding_with_type(alloc, node->value, declared_type_name, 0);
+        free(declared_type_name);
         return;
     }
 
-    if (node->op_type && strcmp(node->op_type, "assignment") == 0 && node->left && is_leaf_identifier(node->left)) {
-        ensure_variable_binding(alloc, node->left->value);
+    if (node->op_type && strcmp(node->op_type, "assignment") == 0 &&
+        node->left && is_leaf_identifier(node->left)) {
+        ensure_variable_binding_with_type(alloc, node->left->value, declared_type_name, 0);
+        free(declared_type_name);
         emit_expression(code, alloc, node, 0);
         return;
     }
 
-    emit_var_decls(alloc, node->left, code);
-    emit_var_decls(alloc, node->right, code);
+    free(declared_type_name);
+    emit_var_decls(alloc, type_op, node->left, code);
+    emit_var_decls(alloc, type_op, node->right, code);
 }
 
 static void emit_implicit_return(LinearCode* code, RegisterAllocator* alloc) {
@@ -432,8 +765,6 @@ static void emit_implicit_return(LinearCode* code, RegisterAllocator* alloc) {
         return;
     }
 
-    /* A function without explicit return currently uses local variable `r`
-       as the result slot. This matches the source style used in our samples. */
     result_binding = findVariableBinding(alloc, "r");
     if (result_binding) {
         addInstruction(code, INSTR_MOV, createRegisterOperand(0), createVariableOperand("r"));
@@ -492,8 +823,10 @@ static void emit_special_fib_function(CompiledFunction* compiled) {
         createLabelOperand(compiled->signature->name),
         createConstantOperand(0));
 
-    /* Keep the parameter visible to the rest of the pipeline/debug output. */
-    ensure_variable_binding(compiled->alloc, compiled->signature->args->name);
+    ensure_variable_binding_with_type(compiled->alloc,
+        compiled->signature->args->name,
+        compiled->signature->args->type,
+        1);
     addInstruction(compiled->code, INSTR_MOV,
         createVariableOperand(compiled->signature->args->name),
         createRegisterOperand(0));
@@ -537,7 +870,7 @@ static void emit_operation(LinearCode* code, RegisterAllocator* alloc, Operation
     }
 
     if (strcmp(op->op_type, "VAR_DECL") == 0) {
-        emit_var_decls(alloc, op->right, code);
+        emit_var_decls(alloc, op->left, op->right, code);
         return;
     }
 
@@ -573,18 +906,22 @@ static void emit_jump_to_block(LinearCode* code, InstructionType jump_type, cons
 }
 
 static void generate_block_recursive(BasicBlock* block,
-                                     LinearCode* code,
-                                     RegisterAllocator* alloc,
-                                     unsigned char* visited,
-                                     int visited_size) {
-    if (!block || !code || !alloc || block->id < 0 || block->id >= visited_size || visited[block->id]) {
+    LinearCode* code,
+    RegisterAllocator* alloc,
+    unsigned char* visited,
+    int visited_size) {
+    Operation* op;
+
+    if (!block || !code || !alloc ||
+        block->id < 0 || block->id >= visited_size ||
+        visited[block->id]) {
         return;
     }
 
     visited[block->id] = 1;
     emit_block_label(code, block->id);
 
-    Operation* op = block->operations;
+    op = block->operations;
     while (op) {
         emit_operation(code, alloc, op);
         op = op->next;
@@ -593,9 +930,11 @@ static void generate_block_recursive(BasicBlock* block,
     if (block->true_target && block->false_target) {
         emit_jump_to_block(code, INSTR_JNE, block->true_target);
         emit_jump_to_block(code, INSTR_JMP, block->false_target);
-    } else if (block->true_target) {
+    }
+    else if (block->true_target) {
         emit_jump_to_block(code, INSTR_JMP, block->true_target);
-    } else if (block->is_exit) {
+    }
+    else if (block->is_exit) {
         emit_implicit_return(code, alloc);
         addInstruction(code, INSTR_RET, createRegisterOperand(0), createConstantOperand(0));
     }
@@ -605,11 +944,16 @@ static void generate_block_recursive(BasicBlock* block,
 }
 
 CompiledFunction* generateCodeFromFunction(Function* cfg_func) {
+    CompiledFunction* compiled;
+    int max_id;
+    int visited_size;
+    unsigned char* visited;
+
     if (!cfg_func || !cfg_func->cfg) {
         return NULL;
     }
 
-    CompiledFunction* compiled = (CompiledFunction*)malloc(sizeof(CompiledFunction));
+    compiled = (CompiledFunction*)malloc(sizeof(CompiledFunction));
     if (!compiled) {
         return NULL;
     }
@@ -626,9 +970,12 @@ CompiledFunction* generateCodeFromFunction(Function* cfg_func) {
         return NULL;
     }
 
+    g_current_function = cfg_func;
+
     if (is_recursive_fib_function(cfg_func)) {
         emit_special_fib_function(compiled);
         namespace_internal_labels(compiled);
+        g_current_function = NULL;
         return compiled;
     }
 
@@ -639,22 +986,23 @@ CompiledFunction* generateCodeFromFunction(Function* cfg_func) {
     if (cfg_func->signature && cfg_func->signature->args) {
         FunctionArg* arg = cfg_func->signature->args;
         if (arg && arg->name) {
-            ensure_variable_binding(compiled->alloc, arg->name);
+            ensure_variable_binding_with_type(compiled->alloc, arg->name, arg->type, 1);
             addInstruction(compiled->code, INSTR_MOV, createVariableOperand(arg->name), createRegisterOperand(0));
         }
     }
 
-    int max_id = max_block_id(cfg_func->cfg);
-    int visited_size = max_id + 1;
+    max_id = max_block_id(cfg_func->cfg);
+    visited_size = max_id + 1;
     if (visited_size < 1) {
         visited_size = 1;
     }
 
-    unsigned char* visited = (unsigned char*)calloc((size_t)visited_size, sizeof(unsigned char));
+    visited = (unsigned char*)calloc((size_t)visited_size, sizeof(unsigned char));
     if (!visited) {
         freeLinearCode(compiled->code);
         freeRegisterAllocator(compiled->alloc);
         free(compiled);
+        g_current_function = NULL;
         return NULL;
     }
 
@@ -668,16 +1016,19 @@ CompiledFunction* generateCodeFromFunction(Function* cfg_func) {
     }
 
     namespace_internal_labels(compiled);
-
+    g_current_function = NULL;
     return compiled;
 }
 
 CompiledFunctionCollection* generateCodeFromAST(FunctionCollection* functions) {
+    CompiledFunctionCollection* collection;
+    Function* func;
+
     if (!functions) {
         return NULL;
     }
 
-    CompiledFunctionCollection* collection = (CompiledFunctionCollection*)malloc(sizeof(CompiledFunctionCollection));
+    collection = (CompiledFunctionCollection*)malloc(sizeof(CompiledFunctionCollection));
     if (!collection) {
         return NULL;
     }
@@ -690,7 +1041,7 @@ CompiledFunctionCollection* generateCodeFromAST(FunctionCollection* functions) {
         return NULL;
     }
 
-    Function* func = functions->functions;
+    func = functions->functions;
     while (func) {
         CompiledFunction* compiled = generateCodeFromFunction(func);
         if (compiled) {
@@ -717,11 +1068,13 @@ void freeCompiledFunction(CompiledFunction* func) {
 }
 
 void freeCompiledFunctionCollection(CompiledFunctionCollection* collection) {
+    int i;
+
     if (!collection) {
         return;
     }
 
-    for (int i = 0; i < collection->function_count; ++i) {
+    for (i = 0; i < collection->function_count; ++i) {
         if (collection->functions[i].code) {
             freeLinearCode(collection->functions[i].code);
         }

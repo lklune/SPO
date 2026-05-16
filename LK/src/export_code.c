@@ -534,7 +534,8 @@ void exportAllCompiledFunctions(CompiledFunctionCollection* collection, const ch
     }
 }
 
-void exportProgramAsm(CompiledFunctionCollection* collection, const char* filepath) {
+void exportProgramAsm(AnalysisResult* result,
+    CompiledFunctionCollection* collection, const char* filepath) {
     if (!collection || !filepath) {
         return;
     }
@@ -546,6 +547,28 @@ void exportProgramAsm(CompiledFunctionCollection* collection, const char* filepa
     }
 
     fprintf(f, "[section code_ram]\n");
+    fprintf(f, "; program structure metadata\n");
+    if (result && result->types) {
+        UserType* type_info = result->types->types;
+        while (type_info) {
+            UserTypeField* field = type_info->fields;
+            fprintf(f, "; .type %s", type_info->name ? type_info->name : "?");
+            if (type_info->base_type_name && *type_info->base_type_name) {
+                fprintf(f, " of %s", type_info->base_type_name);
+            }
+            fprintf(f, " size=%d\n", type_info->size_bytes);
+            while (field) {
+                fprintf(f, "; .field %s.%s : %s offset=%d owner=%s\n",
+                    type_info->name ? type_info->name : "?",
+                    field->name ? field->name : "?",
+                    field->type_name ? field->type_name : "?",
+                    field->offset,
+                    field->owner_type_name ? field->owner_type_name : "?");
+                field = field->next;
+            }
+            type_info = type_info->next;
+        }
+    }
     fprintf(f, "\tJMP __start\n\n");
     fprintf(f, "__start:\n");
     fprintf(f, "\tMOV 1048576, r3\n");
@@ -974,10 +997,12 @@ void exportCompiledFunctionsToSingleFile(CompiledFunctionCollection* collection,
             for (int j = 0; j < func->alloc->binding_count; j++) {
                 VariableBinding* binding = &func->alloc->bindings[j];
                 if (binding->register_id >= 0) {
-                    fprintf(f, "  R%d: %s\n", binding->register_id, binding->var_name);
+                    fprintf(f, "  R%d: %s [%s]\n", binding->register_id, binding->var_name,
+                        binding->type_name ? binding->type_name : "?");
                 }
                 else if (binding->memory_address >= 0) {
-                    fprintf(f, "  MEM[%d]: %s\n", binding->memory_address, binding->var_name);
+                    fprintf(f, "  MEM[%d]: %s [%s]\n", binding->memory_address, binding->var_name,
+                        binding->type_name ? binding->type_name : "?");
                 }
             }
         }

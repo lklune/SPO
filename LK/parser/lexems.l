@@ -84,6 +84,10 @@
  yylval.node = createNode("ARRAY", NULL, NULL, "");
  return ARRAY;
  }
+"type"                                {
+ yylval.node = createNode("TYPE", NULL, NULL, "");
+ return TYPE;
+ }
 "def"                                {
  yylval.node = createNode("DEF", NULL, NULL, "");
  return DEF;
@@ -193,6 +197,9 @@
  }
 ")"                                 {
  return RPAREN;
+ }
+"."                                 {
+ return DOT;
  }
 "="                                 {
  return EQUAL;

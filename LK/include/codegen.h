@@ -81,8 +81,12 @@ typedef struct {
 
 typedef struct {
     char* var_name;
+    char* type_name;
     int register_id;
     int memory_address;
+    int size_bytes;
+    int is_argument;
+    int is_user_type;
     int is_constant;
     long constant_value;
 } VariableBinding;
@@ -127,8 +131,10 @@ RegisterAllocator* createRegisterAllocator(int max_registers, int max_memory);
 int allocateRegister(RegisterAllocator* alloc);
 void freeRegister(RegisterAllocator* alloc, int reg);
 int allocateMemory(RegisterAllocator* alloc);
+int allocateMemorySize(RegisterAllocator* alloc, int size_bytes);
 void bindVariable(RegisterAllocator* alloc, const char* var_name,
-    int register_id, int memory_address);
+    const char* type_name, int register_id, int memory_address,
+    int size_bytes, int is_argument, int is_user_type);
 VariableBinding* findVariableBinding(RegisterAllocator* alloc,
     const char* var_name);
 void freeRegisterAllocator(RegisterAllocator* alloc);

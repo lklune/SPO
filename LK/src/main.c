@@ -123,7 +123,7 @@ int main(int argc, char* argv[]) {
     {
         char program_path[1024];
         snprintf(program_path, sizeof(program_path), "%s/program.asm", code_outdir);
-        exportProgramAsm(compiled, program_path);
+        exportProgramAsm(result, compiled, program_path);
         printf("Exporting combined code: %s\n", program_path);
     }
 

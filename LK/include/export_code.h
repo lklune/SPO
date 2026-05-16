@@ -12,7 +12,8 @@ void exportCompiledFunction(CompiledFunction* func, const char* filepath);
 void exportAllCompiledFunctions(CompiledFunctionCollection* collection,
     const char* output_directory);
 
-void exportProgramAsm(CompiledFunctionCollection* collection,
+void exportProgramAsm(AnalysisResult* result,
+    CompiledFunctionCollection* collection,
     const char* filepath);
 
 void exportCalculatorProgramAsm(const char* filepath);

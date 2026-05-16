@@ -1,0 +1,17 @@
+type Base begin
+    int a;
+end
+
+type Child of Base begin
+    int b;
+end
+
+def main()
+    Child c;
+    int x;
+
+    c.a = 10;
+    c.b = 20;
+    x = c.a + c.b;
+end
+

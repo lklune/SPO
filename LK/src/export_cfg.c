@@ -48,6 +48,8 @@ static void opStr(Operation* op, char* buf, int sz) {
     else if (strcmp(t, "SHIFT_LEFT") == 0)       snprintf(buf, sz, "%s << %s", l, r);
     else if (strcmp(t, "SHIFT_RIGHT") == 0)      snprintf(buf, sz, "%s >> %s", l, r);
     else if (strcmp(t, "CALL") == 0)             snprintf(buf, sz, "%s(...)", l);
+    else if (strcmp(t, "METHOD_CALL") == 0)      snprintf(buf, sz, "%s.%s(...)", l, *v ? v : "?");
+    else if (strcmp(t, "memberAccess") == 0)     snprintf(buf, sz, "%s.%s", l, *v ? v : "?");
     else if (strcmp(t, "IF_COND") == 0)          snprintf(buf, sz, "if (%s)", l);
     else if (strcmp(t, "LOOP_COND") == 0)        snprintf(buf, sz, "%s (%s)", v, l);
     else if (strcmp(t, "REPEAT_COND") == 0)      snprintf(buf, sz, "do..%s (%s)", v, l);
@@ -227,6 +229,9 @@ static void collectCalls(Operation* op, char** calls, int* cnt, int max) {
     if (op->op_type && strcmp(op->op_type, "CALL") == 0)
         if (op->left && op->left->value && *cnt < max)
             calls[(*cnt)++] = op->left->value;
+    if (op->op_type && strcmp(op->op_type, "METHOD_CALL") == 0)
+        if (op->value && *cnt < max)
+            calls[(*cnt)++] = op->value;
     collectCalls(op->left, calls, cnt, max);
     collectCalls(op->right, calls, cnt, max);
 }
