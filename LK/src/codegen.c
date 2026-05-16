@@ -904,6 +904,19 @@ static void emit_operation(LinearCode* code, RegisterAllocator* alloc, Operation
         return;
     }
 
+    if (strcmp(op->op_type, "RETURN") == 0) {
+        if (op->left) {
+            emit_expression(code, alloc, op->left, 0);
+        }
+        else {
+            addInstruction(code, INSTR_LOAD_CONST,
+                createRegisterOperand(0), createConstantOperand(0));
+        }
+        addInstruction(code, INSTR_RET,
+            createRegisterOperand(0), createConstantOperand(0));
+        return;
+    }
+
     emit_expression(code, alloc, op, 0);
 }
 

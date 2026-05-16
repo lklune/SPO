@@ -29,7 +29,7 @@ void yyerror(const char *s);  // �������� ������� 
 %token <node> CHAR
 %token <node> BIN HEX DEC
 %token <node> TRUE FALSE
-%token <node> IF ELSE THAN WHILE UNTIL DO BREAK
+%token <node> IF ELSE THAN WHILE UNTIL DO BREAK RETURN
 %token <node> SEMICOLON
 %token <node> LPAREN RPAREN LBRACE RBRACE LBRACKET RBRACKET
 %token <node> TYPEDEF
@@ -68,6 +68,7 @@ void yyerror(const char *s);  // �������� ������� 
 %type <node> loop
 %type <node> repeat
 %type <node> break
+%type <node> returnStmt
 %type <node> expression
 %type <node> builtin
 %type <node> custom
@@ -205,6 +206,7 @@ statement:
     | repeat { $$ = $1; }
     | block { $$ = $1; }
     | break { $$ = $1; }
+    | returnStmt { $$ = $1; }
     | expression { $$ = $1; }
     ;
 
@@ -252,6 +254,11 @@ repeat:
     ;
 
 break: BREAK SEMICOLON { $$ = createNode("break", NULL, NULL, NULL); };
+
+returnStmt:
+      RETURN expr SEMICOLON { $$ = createNode("return", $2, NULL, NULL); }
+    | RETURN SEMICOLON { $$ = createNode("return", NULL, NULL, NULL); }
+    ;
 
 expression: expr SEMICOLON { $$ = $1; };
 

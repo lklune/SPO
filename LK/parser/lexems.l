@@ -132,6 +132,10 @@
  yylval.node = createNode("BREAK", NULL, NULL, "");
  return BREAK;
  }
+"return"                            {
+ yylval.node = createNode("RETURN", NULL, NULL, "");
+ return RETURN;
+ }
 "{"                                 {
  return LBRACE;
  }

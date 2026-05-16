@@ -60,6 +60,7 @@ static void opStr(Operation* op, char* buf, int sz) {
     else if (strcmp(t, "REPEAT_COND") == 0)      snprintf(buf, sz, "do..%s (%s)", v, l);
     else if (strcmp(t, "VAR_DECL") == 0)         snprintf(buf, sz, "var %s: %s", r, l);
     else if (strcmp(t, "BREAK") == 0)            snprintf(buf, sz, "break");
+    else if (strcmp(t, "RETURN") == 0)           snprintf(buf, sz, "return %s", l);
     else if (*v) snprintf(buf, sz, "%s", v);
     else         buf[0] = '\0';
 }

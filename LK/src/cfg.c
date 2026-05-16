@@ -700,6 +700,13 @@ static BasicBlock* buildBlock(BuildCtx* ctx, Node* node,
         return dead;
     }
 
+    if (strcmp(t, "return") == 0) {
+        addOperationToBlock(current,
+            createOperation("RETURN", exprToOp(node->left), NULL, NULL, 0));
+        BasicBlock* dead = newBlock(ctx);
+        return dead;
+    }
+
     /* ---- sourceItem: определение функции внутри блока ---- */
     if (strcmp(t, "sourceItem") == 0) {
         /* Пропускаем вложенные определения функций */
