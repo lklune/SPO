@@ -109,6 +109,7 @@ source:
 sourceItem: 
       DEF funcSignature listStatement END { 
           $$ = createNode("sourceItem", $2, $3, NULL); 
+          setNodeLine($$, $1 ? $1->line_number : 0);
       }
     /* type рядом с def */
     | typeDecl { $$ = $1; }
@@ -123,10 +124,18 @@ typeDecl:
       /* type ... begin ... end */
       TYPE IDENTIFIER optionalBaseType BEGIN_BLOCK listTypeMember END {
           $$ = createNode("typeDecl", createNode("typeHeader", $3, NULL, $2 ? $2->value : NULL), $5, NULL);
+          if ($$ && $$->left) {
+              setNodeLine($$->left, $1 ? $1->line_number : 0);
+          }
+          setNodeLine($$, $1 ? $1->line_number : 0);
       }
     /* И на всякий случай оставляю такой же вариант через фигурные скобки. */
     | TYPE IDENTIFIER optionalBaseType LBRACE listTypeMember RBRACE {
           $$ = createNode("typeDecl", createNode("typeHeader", $3, NULL, $2 ? $2->value : NULL), $5, NULL);
+          if ($$ && $$->left) {
+              setNodeLine($$->left, $1 ? $1->line_number : 0);
+          }
+          setNodeLine($$, $1 ? $1->line_number : 0);
       }
     ;
 
@@ -151,6 +160,7 @@ fieldDecl:
       /* поле */
       typeRef IDENTIFIER SEMICOLON {
           $$ = createNode("fieldDecl", $1, NULL, $2 ? $2->value : NULL);
+          setNodeLine($$, $1 ? $1->line_number : 0);
       }
     ;
 
@@ -158,6 +168,7 @@ methodDecl:
       /* метод внутри type */
       DEF funcSignature listStatement END {
           $$ = createNode("methodDecl", $2, $3, NULL);
+          setNodeLine($$, $1 ? $1->line_number : 0);
       }
     ;
 
@@ -166,6 +177,7 @@ methodDecl:
 funcSignature: 
       IDENTIFIER LPAREN listArgDef RPAREN optionalTypeRef { 
           $$ = createNode("funcSignature", $3, $5, $1 ? $1->value : NULL); 
+          setNodeLine($$, $1 ? $1->line_number : 0);
       }
     ;
 
@@ -225,6 +237,10 @@ array: typeRef ARRAY LBRACKET DEC RBRACKET { $$ = createNode("array", $1, NULL, 
 
 if: IF expr THAN statement optionalElseStatement { 
         $$ = createNode("if", $2, createNode("ifStatements", $3, $4, NULL), NULL); 
+        if ($$ && $$->right) {
+            setNodeLine($$->right, $1 ? $1->line_number : 0);
+        }
+        setNodeLine($$, $1 ? $1->line_number : 0);
     };
 
 optionalElseStatement: 
@@ -235,29 +251,29 @@ optionalElseStatement:
 /* Block */
 
 block: 
-      LBRACE listStatement RBRACE { $$ = createNode("block", $2, NULL, NULL); }
-    | BEGIN_BLOCK listStatement END { $$ = createNode("block", $2, NULL, NULL); }
-    | LBRACE listSourceItem RBRACE { $$ = createNode("block", $2, NULL, NULL); }
-    | BEGIN_BLOCK listSourceItem END { $$ = createNode("block", $2, NULL, NULL); }
-    | LBRACE RBRACE { $$ = createNode("block", NULL, NULL, NULL); }
-    | BEGIN_BLOCK END { $$ = createNode("block", NULL, NULL, NULL); }
+      LBRACE listStatement RBRACE { $$ = createNode("block", $2, NULL, NULL); setNodeLine($$, $1 ? $1->line_number : 0); }
+    | BEGIN_BLOCK listStatement END { $$ = createNode("block", $2, NULL, NULL); setNodeLine($$, $1 ? $1->line_number : 0); }
+    | LBRACE listSourceItem RBRACE { $$ = createNode("block", $2, NULL, NULL); setNodeLine($$, $1 ? $1->line_number : 0); }
+    | BEGIN_BLOCK listSourceItem END { $$ = createNode("block", $2, NULL, NULL); setNodeLine($$, $1 ? $1->line_number : 0); }
+    | LBRACE RBRACE { $$ = createNode("block", NULL, NULL, NULL); setNodeLine($$, $1 ? $1->line_number : 0); }
+    | BEGIN_BLOCK END { $$ = createNode("block", NULL, NULL, NULL); setNodeLine($$, $1 ? $1->line_number : 0); }
     ;
 
 loop: 
-      WHILE expr listStatement END { $$ = createNode("loop", $2, $3, NULL); }
-    | UNTIL expr listStatement END { $$ = createNode("loop", $2, $3, NULL); }
+      WHILE expr listStatement END { $$ = createNode("loop", $2, $3, NULL); setNodeLine($$, $1 ? $1->line_number : 0); }
+    | UNTIL expr listStatement END { $$ = createNode("loop", $2, $3, NULL); setNodeLine($$, $1 ? $1->line_number : 0); }
     ;
 
 repeat: 
-      statement WHILE expr SEMICOLON { $$ = createNode("loop", $3, $1, NULL); }
-    | statement UNTIL expr SEMICOLON { $$ = createNode("loop", $3, $1, NULL); }
+      statement WHILE expr SEMICOLON { $$ = createNode("loop", $3, $1, NULL); setNodeLine($$, $1 ? $1->line_number : 0); }
+    | statement UNTIL expr SEMICOLON { $$ = createNode("loop", $3, $1, NULL); setNodeLine($$, $1 ? $1->line_number : 0); }
     ;
 
-break: BREAK SEMICOLON { $$ = createNode("break", NULL, NULL, NULL); };
+break: BREAK SEMICOLON { $$ = createNode("break", NULL, NULL, NULL); setNodeLine($$, $1 ? $1->line_number : 0); };
 
 returnStmt:
-      RETURN expr SEMICOLON { $$ = createNode("return", $2, NULL, NULL); }
-    | RETURN SEMICOLON { $$ = createNode("return", NULL, NULL, NULL); }
+      RETURN expr SEMICOLON { $$ = createNode("return", $2, NULL, NULL); setNodeLine($$, $1 ? $1->line_number : 0); }
+    | RETURN SEMICOLON { $$ = createNode("return", NULL, NULL, NULL); setNodeLine($$, $1 ? $1->line_number : 0); }
     ;
 
 expression: expr SEMICOLON { $$ = $1; };
@@ -305,17 +321,21 @@ call: IDENTIFIER LPAREN optionalListExpr RPAREN { $$ = createNode("CALL", $1, $3
 /* вызов через точку */
 methodCall: place DOT IDENTIFIER LPAREN optionalListExpr RPAREN {
         $$ = createNode("METHOD_CALL", $1, $5, $3 ? $3->value : NULL);
+        setNodeLine($$, $1 ? $1->line_number : 0);
     }
     | memberAccess DOT IDENTIFIER LPAREN optionalListExpr RPAREN {
         $$ = createNode("METHOD_CALL", $1, $5, $3 ? $3->value : NULL);
+        setNodeLine($$, $1 ? $1->line_number : 0);
     };
 
 /* цепочка a.b.c */
 memberAccess: place DOT IDENTIFIER {
         $$ = createNode("memberAccess", $1, NULL, $3 ? $3->value : NULL);
+        setNodeLine($$, $1 ? $1->line_number : 0);
     }
     | memberAccess DOT IDENTIFIER {
         $$ = createNode("memberAccess", $1, NULL, $3 ? $3->value : NULL);
+        setNodeLine($$, $1 ? $1->line_number : 0);
     };
 
 optionalListExpr: listExpr { $$ = createNode("optionalListExpr", $1, NULL, NULL); }
@@ -351,6 +371,6 @@ listVarDeclared: listVarDeclaredItem COMMA listVarDeclared { $$ = createNode("li
 listVarDeclaredItem: IDENTIFIER { $$ = $1; }
     | assignment { $$ = $1; };
 
-var: typeRef listVarDeclared SEMICOLON { $$ = createNode("var", $1, $2, NULL); };
+var: typeRef listVarDeclared SEMICOLON { $$ = createNode("var", $1, $2, NULL); setNodeLine($$, $1 ? $1->line_number : 0); };
 
 %%

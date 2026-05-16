@@ -6,6 +6,8 @@
 #include <string.h>
 %}
 
+%option yylineno
+
 %%
 
 [0-9]+ {

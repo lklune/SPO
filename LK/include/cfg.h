@@ -42,6 +42,7 @@ struct UserTypeField {
     char* type_name;
     int offset;
     char* owner_type_name;
+    int line_number;
     UserTypeField* next;
 };
 
@@ -51,6 +52,7 @@ struct UserTypeMethod {
     char* full_name;
     char* return_type;
     Node* ast_node;
+    int line_number;
     UserTypeMethod* next;
 };
 
@@ -63,6 +65,7 @@ struct UserType {
     int size_bytes;
     int resolved;
     int resolving;
+    int line_number;
     UserType* next;
 };
 

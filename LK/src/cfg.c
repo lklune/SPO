@@ -492,9 +492,9 @@ static Operation* exprToOp(Node* node) {
         strcmp(t, "METHOD_CALL") == 0) {
         if (strcmp(t, "memberAccess") == 0 || strcmp(t, "METHOD_CALL") == 0) {
             return createOperation((char*)t, exprToOp(node->left),
-                exprToOp(node->right), v, 0);
+                exprToOp(node->right), v, node->line_number);
         }
-        return createOperation((char*)t, NULL, NULL, v, 0);
+        return createOperation((char*)t, NULL, NULL, v, node->line_number);
     }
 
     /* Бинарные/унарные операции */
@@ -503,7 +503,7 @@ static Operation* exprToOp(Node* node) {
 
     /* Для именованных операций (SUM, MINUS, MUL, ...) */
     const char* op_label = (*t != '\0') ? t : ((*v != '\0') ? v : "<op>");
-    Operation* op = createOperation((char*)op_label, left, right, v, 0);
+    Operation* op = createOperation((char*)op_label, left, right, v, node->line_number);
     return op;
 }
 
@@ -542,7 +542,7 @@ static BasicBlock* buildBlock(BuildCtx* ctx, Node* node,
     /* ---- var declaration ---- */
     if (strcmp(t, "var") == 0) {
         Operation* op = createOperation("VAR_DECL", exprToOp(node->left),
-            exprToOp(node->right), NULL, 0);
+            exprToOp(node->right), NULL, node->line_number);
         addOperationToBlock(current, op);
         if (!current->ast_node) current->ast_node = node;
         return current;
@@ -593,7 +593,7 @@ static BasicBlock* buildBlock(BuildCtx* ctx, Node* node,
     if (strcmp(t, "if") == 0) {
         /* Структура: if->left = condition, if->right = ifStatements(left=then, right=else|NULL) */
         Operation* cond_op = exprToOp(node->left);
-        addOperationToBlock(current, createOperation("IF_COND", cond_op, NULL, NULL, 0));
+        addOperationToBlock(current, createOperation("IF_COND", cond_op, NULL, NULL, node->line_number));
 
         BasicBlock* merge_block = newBlock(ctx);
 
@@ -650,7 +650,7 @@ static BasicBlock* buildBlock(BuildCtx* ctx, Node* node,
             }
 
             addOperationToBlock(cond_block,
-                createOperation("LOOP_COND", exprToOp(node->left), NULL, "while", 0));
+                createOperation("LOOP_COND", exprToOp(node->left), NULL, "while", node->line_number));
             cond_block->true_target = body_block;
             cond_block->false_target = exit_block;
 
@@ -669,7 +669,7 @@ static BasicBlock* buildBlock(BuildCtx* ctx, Node* node,
             }
 
             addOperationToBlock(cond_block,
-                createOperation("REPEAT_COND", exprToOp(node->left), NULL, "while", 0));
+                createOperation("REPEAT_COND", exprToOp(node->left), NULL, "while", node->line_number));
             cond_block->true_target = body_block;
             cond_block->false_target = exit_block;
         }
@@ -683,13 +683,13 @@ static BasicBlock* buildBlock(BuildCtx* ctx, Node* node,
 
     /* ---- break ---- */
     if (strcmp(t, "break") == 0) {
-        addOperationToBlock(current, createOperation("BREAK", NULL, NULL, NULL, 0));
+        addOperationToBlock(current, createOperation("BREAK", NULL, NULL, NULL, node->line_number));
         if (ctx->break_depth > 0) {
             current->true_target = ctx->break_targets[ctx->break_depth - 1];
         }
         else {
             addErrorToCollection(ctx->errors,
-                "break outside of loop", ctx->filename, 0);
+                "break outside of loop", ctx->filename, node->line_number);
         }
         /*
          * Код после break в той же ветке недостижим.
@@ -702,7 +702,7 @@ static BasicBlock* buildBlock(BuildCtx* ctx, Node* node,
 
     if (strcmp(t, "return") == 0) {
         addOperationToBlock(current,
-            createOperation("RETURN", exprToOp(node->left), NULL, NULL, 0));
+            createOperation("RETURN", exprToOp(node->left), NULL, NULL, node->line_number));
         BasicBlock* dead = newBlock(ctx);
         return dead;
     }
@@ -724,14 +724,14 @@ static BasicBlock* buildBlock(BuildCtx* ctx, Node* node,
         addOperationToBlock(current,
             createOperation(label, exprToOp(node->left),
                 exprToOp(node->right),
-                node->value, 0));
+                node->value, node->line_number));
     }
     return current;
 }
 
 /* Добавление поля в тип без расчёта offset */
 static void addTypeField(UserType* type_info, const char* field_name,
-    const char* field_type_name) {
+    const char* field_type_name, int line_number) {
     UserTypeField* field;
 
     if (!type_info || !field_name) return;
@@ -744,6 +744,7 @@ static void addTypeField(UserType* type_info, const char* field_name,
     field->type_name = field_type_name ? strdup(field_type_name) : strdup("?");
     field->offset = 0;
     field->owner_type_name = type_info->name ? strdup(type_info->name) : NULL;
+    field->line_number = line_number;
     field->next = NULL;
 
     if (!type_info->fields) {
@@ -760,7 +761,7 @@ static void addTypeField(UserType* type_info, const char* field_name,
  * Сохраняется полное имя для asm и AST узел для будущей сборки CFG
  */
 static void addTypeMethod(UserType* type_info, const char* method_name,
-    const char* full_name, const char* return_type, Node* ast_node) {
+    const char* full_name, const char* return_type, Node* ast_node, int line_number) {
     UserTypeMethod* method;
 
     if (!type_info || !method_name || !full_name) return;
@@ -773,6 +774,7 @@ static void addTypeMethod(UserType* type_info, const char* method_name,
     method->full_name = strdup(full_name);
     method->return_type = return_type ? strdup(return_type) : strdup("?");
     method->ast_node = ast_node;
+    method->line_number = line_number;
     method->next = NULL;
 
     if (!type_info->methods) {
@@ -823,7 +825,7 @@ static void collectTypeMembers(UserType* type_info, Node* node) {
     if (node->type && strcmp(node->type, "fieldDecl") == 0) {
         char* field_type_name = buildTypeNameFromNode(node->left);
         addTypeField(type_info, node->value ? node->value : "?",
-            field_type_name);
+            field_type_name, node->line_number);
         free(field_type_name);
         return;
     }
@@ -837,7 +839,7 @@ static void collectTypeMembers(UserType* type_info, Node* node) {
             node->left->value ? node->left->value : "method");
         addTypeMethod(type_info,
             node->left->value ? node->left->value : "method",
-            full_name, return_type_name, node);
+            full_name, return_type_name, node, node->line_number);
         free(return_type_name);
     }
 }
@@ -863,12 +865,13 @@ static UserType* buildTypeFromDecl(Node* type_decl, ErrorCollection* errors,
     type_info->size_bytes = 0;
     type_info->resolved = 0;
     type_info->resolving = 0;
+    type_info->line_number = type_decl->line_number;
     type_info->next = NULL;
 
     if (type_info->base_type_name &&
         strcmp(type_info->base_type_name, type_info->name) == 0) {
         addErrorToCollection(errors, "Type cannot inherit from itself",
-            filename, 0);
+            filename, type_decl->line_number);
     }
 
     collectTypeMembers(type_info, type_decl->right);
@@ -891,7 +894,7 @@ static int resolveUserTypeLayout(TypeCollection* types, UserType* type_info,
 
     if (type_info->resolving) {
         addErrorToCollection(errors, "Cyclic type inheritance detected",
-            filename, 0);
+            filename, type_info->line_number);
         return 0;
     }
 
@@ -901,7 +904,7 @@ static int resolveUserTypeLayout(TypeCollection* types, UserType* type_info,
         UserType* base_type = findUserType(types, type_info->base_type_name);
         if (!base_type) {
             addErrorToCollection(errors, "Unknown base type",
-                filename, 0);
+                filename, type_info->line_number);
         }
         else {
             /* сначала база */
@@ -917,7 +920,7 @@ static int resolveUserTypeLayout(TypeCollection* types, UserType* type_info,
         if (type_info->base_type_name &&
             findUserTypeField(types, type_info->base_type_name, field->name)) {
             addErrorToCollection(errors, "Field hides inherited field",
-                filename, 0);
+                filename, field->line_number);
         }
 
         /* если поле тоже user type, сначала считаю его */
@@ -927,7 +930,7 @@ static int resolveUserTypeLayout(TypeCollection* types, UserType* type_info,
             UserType* field_type = findUserType(types, field->type_name);
             if (!field_type) {
                 addErrorToCollection(errors, "Unknown field type",
-                    filename, 0);
+                    filename, field->line_number);
             }
             else {
                 resolveUserTypeLayout(types, field_type, errors, filename);
@@ -1033,7 +1036,7 @@ static Function* buildFunctionCFG(Node* source_item, const char* filename,
 
     if (!sig_node) {
         addErrorToCollection(errors, "Function-like node without signature",
-            filename, 0);
+            filename, source_item->line_number);
         return NULL;
     }
 
@@ -1098,7 +1101,7 @@ AnalysisResult* buildCFGFromAST(FileCollection* file_collection) {
                     if (!type_info) continue;
                     if (findUserType(types, type_info->name)) {
                         addErrorToCollection(errors, "Duplicate type declaration",
-                            fi->filename, 0);
+                            fi->filename, type_info->line_number);
                     }
                     else {
                         addTypeToCollection(types, type_info);
