@@ -52,6 +52,8 @@ static void formatAsmOperand(Operand* operand,
             snprintf(buffer, (size_t)buffer_size, "%d", binding->memory_address);
         }
         else {
+            fprintf(stderr, "Unknown variable binding in asm export: %s\n",
+                operand->value.name ? operand->value.name : "?");
             snprintf(buffer, (size_t)buffer_size, "0");
         }
         break;

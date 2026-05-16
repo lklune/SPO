@@ -891,69 +891,6 @@ static void namespace_internal_labels(CompiledFunction* compiled) {
     }
 }
 
-/* Старый special-case для fib */
-static int is_recursive_fib_function(const Function* cfg_func) {
-    return cfg_func &&
-        cfg_func->signature &&
-        cfg_func->signature->name &&
-        strcmp(cfg_func->signature->name, "fib") == 0 &&
-        cfg_func->signature->args &&
-        cfg_func->signature->args->name != NULL;
-}
-
-/* Ручная генерация fib
- * Оставлена отдельно из старой логики проекта
- */
-static void emit_special_fib_function(CompiledFunction* compiled) {
-    if (!compiled || !compiled->code || !compiled->signature || !compiled->signature->args) {
-        return;
-    }
-
-    addInstruction(compiled->code, INSTR_LABEL,
-        createLabelOperand(compiled->signature->name),
-        createConstantOperand(0));
-
-    ensure_variable_binding_with_type(compiled->alloc,
-        compiled->signature->args->name,
-        compiled->signature->args->type,
-        1);
-    addInstruction(compiled->code, INSTR_MOV,
-        createVariableOperand(compiled->signature->args->name),
-        createRegisterOperand(0));
-
-    addInstruction(compiled->code, INSTR_LOAD_CONST,
-        createRegisterOperand(3),
-        createConstantOperand(0x0FFFFFFF));
-    addInstruction(compiled->code, INSTR_BIT_AND,
-        createRegisterOperand(0),
-        createRegisterOperand(3));
-    addInstruction(compiled->code, INSTR_MOV, createRegisterOperand(1), createRegisterOperand(0));
-    addInstruction(compiled->code, INSTR_CMP, createRegisterOperand(1), createConstantOperand(1));
-    addInstruction(compiled->code, INSTR_JEQ, createLabelOperand("fib_base"), createConstantOperand(0));
-    addInstruction(compiled->code, INSTR_CMP, createRegisterOperand(1), createConstantOperand(2));
-    addInstruction(compiled->code, INSTR_JEQ, createLabelOperand("fib_base"), createConstantOperand(0));
-
-    addInstruction(compiled->code, INSTR_PUSH, createRegisterOperand(1), createConstantOperand(0));
-    addInstruction(compiled->code, INSTR_MOV, createRegisterOperand(0), createRegisterOperand(1));
-    addInstruction(compiled->code, INSTR_LOAD_CONST, createRegisterOperand(2), createConstantOperand(2));
-    addInstruction(compiled->code, INSTR_SUB, createRegisterOperand(0), createRegisterOperand(2));
-    addInstruction(compiled->code, INSTR_CALL, createLabelOperand("fib"), createConstantOperand(0));
-    addInstruction(compiled->code, INSTR_POP, createRegisterOperand(1), createConstantOperand(0));
-    addInstruction(compiled->code, INSTR_PUSH, createRegisterOperand(0), createConstantOperand(0));
-    addInstruction(compiled->code, INSTR_MOV, createRegisterOperand(0), createRegisterOperand(1));
-    addInstruction(compiled->code, INSTR_LOAD_CONST, createRegisterOperand(2), createConstantOperand(1));
-    addInstruction(compiled->code, INSTR_SUB, createRegisterOperand(0), createRegisterOperand(2));
-    addInstruction(compiled->code, INSTR_CALL, createLabelOperand("fib"), createConstantOperand(0));
-    addInstruction(compiled->code, INSTR_POP, createRegisterOperand(1), createConstantOperand(0));
-    addInstruction(compiled->code, INSTR_ADD, createRegisterOperand(1), createRegisterOperand(0));
-    addInstruction(compiled->code, INSTR_MOV, createRegisterOperand(0), createRegisterOperand(1));
-    addInstruction(compiled->code, INSTR_RET, createRegisterOperand(0), createConstantOperand(0));
-
-    addInstruction(compiled->code, INSTR_LABEL, createLabelOperand("fib_base"), createConstantOperand(0));
-    addInstruction(compiled->code, INSTR_LOAD_CONST, createRegisterOperand(0), createConstantOperand(1));
-    addInstruction(compiled->code, INSTR_RET, createRegisterOperand(0), createConstantOperand(0));
-}
-
 /* Генерация одной операции верхнего уровня в block */
 static void emit_operation(LinearCode* code, RegisterAllocator* alloc, Operation* op) {
     if (!code || !op) {
@@ -1070,13 +1007,6 @@ CompiledFunction* generateCodeFromFunction(Function* cfg_func) {
     }
 
     g_current_function = cfg_func;
-
-    if (is_recursive_fib_function(cfg_func)) {
-        emit_special_fib_function(compiled);
-        namespace_internal_labels(compiled);
-        g_current_function = NULL;
-        return compiled;
-    }
 
     if (cfg_func->signature && cfg_func->signature->name) {
         addInstruction(compiled->code, INSTR_LABEL, createLabelOperand(cfg_func->signature->name), createConstantOperand(0));

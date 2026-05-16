@@ -45,3 +45,16 @@ make vm-run         -- запуск калькулятора на VM
 
 dot:
 dot -Tpng generated/call_graph.dot -o generated/call_graph.png
+
+AST-дерево
+python3 tools/json_to_dot.py generated/test_basic/types_basic.ast.json generated/test_basic/types_basic.ast.dot
+dot -Tpng generated/test_basic/types_basic.ast.dot -o generated/test_basic/types_basic.ast.png
+
+
+
+Порядок такой:
+    -- исходный текст
+    -- парсер строит AST
+    -- из AST строится CFG
+    -- из CFG генерируется линейный код
+    -- потом собирается program.asm

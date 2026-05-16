@@ -75,6 +75,8 @@ int main(int argc, char* argv[]) {
 
     const char* outdir = NULL;
     int         first_file = 1;
+    int         had_parse_errors = 0;
+    int         parsed_files = 0;
 
     if (argc >= 3 && strcmp(argv[1], "-o") == 0) {
         outdir = argv[2];
@@ -86,7 +88,6 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // start
     FileCollection* file_col = createFileCollection();
 
     for (int i = first_file; i < argc; i++) {
@@ -95,20 +96,29 @@ int main(int argc, char* argv[]) {
 
         Node* root = parseFile(fname);
         if (!root) {
+            had_parse_errors = 1;
             fprintf(stderr, "Skipping file to parse error: %s\n", fname);
             continue;
         }
+
+        parsed_files++;
 
         /* Экспорт AST в JSON */
         char ast_path[1024];
         char bname[256], dname[256];
         basename_noext(fname, bname, sizeof(bname));
         dirname_of(fname, dname, sizeof(dname));
-        snprintf(ast_path, sizeof(ast_path), "%s/%s.ast.json", dname, bname);
+        snprintf(ast_path, sizeof(ast_path), "%s/%s.ast.json",
+            outdir ? outdir : dname, bname);
         exportAstToJson(root, ast_path);
         printf("  AST saved: %s\n", ast_path);
 
         addFileToCollection(file_col, fname, root);
+    }
+
+    if (parsed_files == 0) {
+        fprintf(stderr, "No input files parsed successfully.\n");
+        return 1;
     }
 
     /* Build CFG */
@@ -195,7 +205,9 @@ int main(int argc, char* argv[]) {
         result->functions->function_count,
         result->errors->error_count);
 
+    int exit_code = (had_parse_errors || result->errors->error_count > 0) ? 1 : 0;
+
     freeCompiledFunctionCollection(compiled);
     freeAnalysisResult(result);
-    return 0;
+    return exit_code;
 }

@@ -89,7 +89,7 @@ clean-generated:
 run-input:
 	rm -rf $(GEN_DIR)/input
 	mkdir -p $(GEN_DIR)/input
-	./$(BIN_DIR)/run_compiler -o $(GEN_DIR)/input input.txt
+	./$(BIN_DIR)/run_compiler -o $(GEN_DIR)/input test_input/input.txt
 
 run-calc:
 	rm -rf $(GEN_DIR)/calc

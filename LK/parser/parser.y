@@ -255,7 +255,7 @@ break: BREAK SEMICOLON { $$ = createNode("break", NULL, NULL, NULL); };
 
 expression: expr SEMICOLON { $$ = $1; };
 
-assignment: expr EQUAL expr { $$ = createNode("assignment", $1, $3, NULL); };
+assignment: expr EQUAL expr %prec ASSIGN { $$ = createNode("assignment", $1, $3, NULL); };
 
 expr: unary { $$ = $1; }
     | binary { $$ = $1; }

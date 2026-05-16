@@ -1,6 +1,8 @@
 %{
 #include "error.h"
 #include "parser.tab.h"
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 %}
 
@@ -11,15 +13,21 @@
     return DEC;
 }
 \"[^\"\\]*(?:\\.[^\"\\]*)*\" {
-    char buffer[1024];
-    strncpy(buffer, yytext+1, strlen(yytext)-2);
-    buffer[strlen(buffer)-1] = 0;
+    size_t len = strlen(yytext);
+    char* buffer = (char*)malloc(len > 1 ? len - 1 : 1);
+    if (!buffer) {
+        return 0;
+    }
+    memcpy(buffer, yytext + 1, len - 2);
+    buffer[len - 2] = '\0';
     yylval.node = createNode("STR", NULL, NULL, buffer);
+    free(buffer);
     return STR;
 }
 '[^']' {
-    char buffer[1];
-    strncpy(buffer, yytext+1, 1);
+    char buffer[2];
+    buffer[0] = yytext[1];
+    buffer[1] = '\0';
     yylval.node = createNode("CHAR", NULL, NULL, buffer);
     return CHAR;
 }
@@ -29,14 +37,14 @@
 }
 
 0[xX][0-9A-Fa-f]+ {
-    char* buffer = malloc(256);
-    sprintf(buffer, "%ld", strtol(yytext + 2, NULL, 16));
+    char buffer[256];
+    snprintf(buffer, sizeof(buffer), "%ld", strtol(yytext + 2, NULL, 16));
     yylval.node = createNode("HEX", NULL, NULL, buffer);
     return HEX;
 }
 0[bB][01]+ {
-    char* buffer = malloc(256);
-    sprintf(buffer, "%ld", strtol(yytext + 2, NULL, 2));
+    char buffer[256];
+    snprintf(buffer, sizeof(buffer), "%ld", strtol(yytext + 2, NULL, 2));
     yylval.node = createNode("BIN", NULL, NULL, buffer);
     return BIN;
 }
@@ -215,6 +223,5 @@
 %%
 
 int yywrap(void) {
-    // Your implementation here, typically returning 1 to signal EOF.
     return 1;
 }

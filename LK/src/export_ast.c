@@ -25,11 +25,8 @@ static void escape_json_string(FILE* f, const char* s) {
             if (c < 32) {
                 fprintf(f, "\\u%04x", c);
             }
-            else if (c < 127) {
-                fprintf(f, "%c", c);
-            }
             else {
-
+                fprintf(f, "%c", c);
             }
         }
     }
