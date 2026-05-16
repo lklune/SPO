@@ -842,13 +842,30 @@ static int resolveUserTypeLayout(TypeCollection* types, UserType* type_info,
 
     field = type_info->fields;
     while (field) {
+        int field_size = 4;
+
         if (type_info->base_type_name &&
             findUserTypeField(types, type_info->base_type_name, field->name)) {
             addErrorToCollection(errors, "Field hides inherited field",
                 filename, 0);
         }
+
+        if (field->type_name &&
+            !isBuiltinTypeName(field->type_name) &&
+            strncmp(field->type_name, "array(", 6) != 0) {
+            UserType* field_type = findUserType(types, field->type_name);
+            if (!field_type) {
+                addErrorToCollection(errors, "Unknown field type",
+                    filename, 0);
+            }
+            else {
+                resolveUserTypeLayout(types, field_type, errors, filename);
+            }
+        }
+
+        field_size = getTypeStorageSize(types, field->type_name);
         field->offset = offset;
-        offset += 4;
+        offset += field_size;
         field = field->next;
     }
 

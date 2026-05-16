@@ -224,24 +224,61 @@ void exportCFGToDot(Function* func, const char* filepath) {
     fclose(f);
 }
 
-static void collectCalls(Operation* op, char** calls, int* cnt, int max) {
+static const char* resolveMethodGraphName(FunctionCollection* functions,
+    const char* method_name) {
+    Function* func;
+    const char* resolved = NULL;
+    int matches = 0;
+    char suffix[256];
+    size_t suffix_len;
+
+    if (!method_name || !functions) {
+        return method_name;
+    }
+
+    snprintf(suffix, sizeof(suffix), "__%s", method_name);
+    suffix_len = strlen(suffix);
+
+    func = functions->functions;
+    while (func) {
+        const char* full_name = (func->signature && func->signature->name)
+            ? func->signature->name : NULL;
+        size_t full_len = full_name ? strlen(full_name) : 0;
+
+        if (full_name && full_len > suffix_len &&
+            strcmp(full_name + full_len - suffix_len, suffix) == 0) {
+            resolved = full_name;
+            matches++;
+        }
+        func = func->next;
+    }
+
+    return matches == 1 ? resolved : method_name;
+}
+
+static void collectCalls(Operation* op, FunctionCollection* functions,
+    char** calls, int* cnt, int max) {
     if (!op) return;
     if (op->op_type && strcmp(op->op_type, "CALL") == 0)
         if (op->left && op->left->value && *cnt < max)
             calls[(*cnt)++] = op->left->value;
     if (op->op_type && strcmp(op->op_type, "METHOD_CALL") == 0)
         if (op->value && *cnt < max)
-            calls[(*cnt)++] = op->value;
-    collectCalls(op->left, calls, cnt, max);
-    collectCalls(op->right, calls, cnt, max);
+            calls[(*cnt)++] = (char*)resolveMethodGraphName(functions, op->value);
+    collectCalls(op->left, functions, calls, cnt, max);
+    collectCalls(op->right, functions, calls, cnt, max);
 }
 
-static void collectCallsFromCFG(CFG* cfg, char** calls, int* cnt, int max) {
+static void collectCallsFromCFG(CFG* cfg, FunctionCollection* functions,
+    char** calls, int* cnt, int max) {
     if (!cfg) return;
     BasicBlock* bb = cfg->blocks;
     while (bb) {
         Operation* op = bb->operations;
-        while (op) { collectCalls(op, calls, cnt, max); op = op->next; }
+        while (op) {
+            collectCalls(op, functions, calls, cnt, max);
+            op = op->next;
+        }
         bb = bb->next;
     }
 }
@@ -267,7 +304,7 @@ void exportCallGraphToDot(FunctionCollection* functions, const char* filepath) {
     while (func) {
         if (!func->signature || !func->signature->name) { func = func->next; continue; }
         char* calls[256]; int cc = 0;
-        collectCallsFromCFG(func->cfg, calls, &cc, 256);
+        collectCallsFromCFG(func->cfg, functions, calls, &cc, 256);
         for (int i = 0; i < cc; i++)
             fprintf(f, "  \"%s\" -> \"%s\";\n", func->signature->name, calls[i]);
         func = func->next;
