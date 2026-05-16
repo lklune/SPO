@@ -16,9 +16,4 @@ void exportProgramAsm(AnalysisResult* result,
     CompiledFunctionCollection* collection,
     const char* filepath);
 
-void exportCalculatorProgramAsm(const char* filepath);
-
-void exportCompiledFunctionsToSingleFile(CompiledFunctionCollection* collection,
-    const char* filepath);
-
 #endif // EXPORT_CODE_H

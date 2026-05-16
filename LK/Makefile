@@ -83,9 +83,6 @@ clean:
 
 rebuild: clean all
 
-clean-generated:
-	rm -rf $(GEN_DIR)
-
 run-input:
 	rm -rf $(GEN_DIR)/input
 	mkdir -p $(GEN_DIR)/input
@@ -125,4 +122,4 @@ vm-run: $(BIN_DIR)/run_compiler | $(GEN_DIR)
 	$(TT) -ws -g "$$id" -r out.ptptb -o out.ptptb; \
 	$(TT) -ws -il -s ExecuteBinaryWithInteractiveInput definitionFile vm.target.pdsl stdinRegStName sin stdoutRegStName sout archName vm binaryFileToRun out.ptptb ipRegStorageName ipst finishMnemonicName END codeRamBankName code_ram
 
-.PHONY: all clean rebuild clean-generated run-input run-calc test test-nested test-method tests vm-run
+.PHONY: all clean rebuild run-input run-calc test test-nested test-method tests vm-run

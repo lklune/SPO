@@ -87,8 +87,6 @@ typedef struct {
     int size_bytes;
     int is_argument;
     int is_user_type;
-    int is_constant;
-    long constant_value;
 } VariableBinding;
 
 typedef struct {
@@ -106,7 +104,6 @@ typedef struct {
     FunctionSignature* signature;
     LinearCode* code;
     RegisterAllocator* alloc;
-    int code_start_line;
 } CompiledFunction;
 
 typedef struct {

@@ -1,6 +1,16 @@
 ﻿#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
+
+#ifdef _WIN32
+#include <direct.h>
+#define MKDIR(path) _mkdir(path)
+#else
+#include <sys/stat.h>
+#include <sys/types.h>
+#define MKDIR(path) mkdir(path, 0777)
+#endif
 
 #include "node.h"
 #include "error.h"
@@ -38,6 +48,40 @@ static void dirname_of(const char* path, char* out, int out_size) {
         if (*q == '/' || *q == '\\') last_sep = q;
     if (last_sep) *last_sep = '\0';
     else          strncpy(out, ".", out_size);
+}
+
+static void ensure_directory_exists(const char* path) {
+    char buffer[1024];
+    size_t len;
+
+    if (!path || !*path) {
+        return;
+    }
+
+    len = strlen(path);
+    if (len >= sizeof(buffer)) {
+        return;
+    }
+
+    strcpy(buffer, path);
+
+    for (size_t i = 1; i < len; i++) {
+        if (buffer[i] == '/' || buffer[i] == '\\') {
+            char saved = buffer[i];
+            buffer[i] = '\0';
+            if (buffer[0] != '\0') {
+                if (MKDIR(buffer) != 0 && errno != EEXIST) {
+                    buffer[i] = saved;
+                    return;
+                }
+            }
+            buffer[i] = saved;
+        }
+    }
+
+    if (MKDIR(buffer) != 0 && errno != EEXIST) {
+        return;
+    }
 }
 
 /* Разбор одного входного файла
@@ -86,6 +130,10 @@ int main(int argc, char* argv[]) {
     if (first_file >= argc) {
         fprintf(stderr, "No input files specified.\n");
         return 1;
+    }
+
+    if (outdir) {
+        ensure_directory_exists(outdir);
     }
 
     FileCollection* file_col = createFileCollection();

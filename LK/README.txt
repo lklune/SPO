@@ -58,3 +58,10 @@ dot -Tpng generated/test_basic/types_basic.ast.dot -o generated/test_basic/types
     -- из AST строится CFG
     -- из CFG генерируется линейный код
     -- потом собирается program.asm
+
+
+Вывод в консоль результатов:
+ls -la generated/test_basic
+cat generated/test_basic/program.asm
+cat generated/test_basic/main.linear_code.txt
+cat generated/test_basic/call_graph.dot

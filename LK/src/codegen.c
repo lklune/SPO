@@ -223,8 +223,6 @@ void bindVariable(RegisterAllocator* alloc, const char* var_name,
     binding->size_bytes = size_bytes > 0 ? size_bytes : 4;
     binding->is_argument = is_argument;
     binding->is_user_type = is_user_type;
-    binding->is_constant = 0;
-    binding->constant_value = 0;
 }
 
 /* Поиск уже созданной привязки переменной по имени */
@@ -997,7 +995,6 @@ CompiledFunction* generateCodeFromFunction(Function* cfg_func) {
     compiled->signature = cfg_func->signature;
     compiled->code = createLinearCode();
     compiled->alloc = createRegisterAllocator(16, 1024);
-    compiled->code_start_line = 0;
 
     if (!compiled->code || !compiled->alloc) {
         if (compiled->code) freeLinearCode(compiled->code);

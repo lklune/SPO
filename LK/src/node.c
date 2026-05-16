@@ -1,6 +1,5 @@
 #include "node.h"
 #include <stdlib.h>
-#include <stdio.h>
 #include <string.h>
 
 Node** allNodes = NULL;
@@ -27,17 +26,4 @@ Node* createNode(char* type, Node* left, Node* right, const char* value) {
     allNodes[allNodesCount++] = node;
 
     return node;
-}
-
-void printTree(const Node* root, int level) {
-    if (!root) return;
-
-    for (int i = 0; i < level; i++) {
-        printf("  ");
-    }
-
-    const char* label = root->value ? root->value : (root->type ? root->type : "<node>");
-    printf("%s\n", label);
-    printTree(root->left, level + 1);
-    printTree(root->right, level + 1);
 }
