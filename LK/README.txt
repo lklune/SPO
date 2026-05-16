@@ -41,3 +41,7 @@ make test-method    -- тест методов пользовательских 
 Калькулятор:
 make run-calc       -- компиляция calc.src и сохранение результата в generated/calc
 make vm-run         -- запуск калькулятора на VM
+
+
+dot:
+dot -Tpng generated/call_graph.dot -o generated/call_graph.png

@@ -235,7 +235,7 @@ void exportCFGToDot(Function* func, const char* filepath) {
     fclose(f);
 }
 
-/* Замена короткого имени метода на полное
+/* Замена короткого имени метода на полное для уникальности имени метода
  * Например, ping -> Counter__ping
  */
 static const char* resolveMethodGraphName(FunctionCollection* functions,
