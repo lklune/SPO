@@ -7,10 +7,14 @@
 static int g_label_counter = 0;
 static Function* g_current_function = NULL;
 
+/* Создание уникальной метки для внутренних переходов */
 static void make_auto_label(char* buf, size_t size, const char* prefix) {
     snprintf(buf, size, "%s_%d", prefix, g_label_counter++);
 }
 
+/* Набор helper-функций для создания операндов
+ * Упрощает заполнение структуры операнда
+ */
 Operand createRegisterOperand(int reg_id) {
     Operand op;
     op.type = OPERAND_REGISTER;
@@ -46,6 +50,7 @@ Operand createStringOperand(const char* string) {
     return op;
 }
 
+/* Создание пустого буфера линейного кода */
 LinearCode* createLinearCode(void) {
     LinearCode* code = (LinearCode*)malloc(sizeof(LinearCode));
     if (!code) {
@@ -63,6 +68,9 @@ LinearCode* createLinearCode(void) {
     return code;
 }
 
+/* Добавление инструкции в линейный код
+ * При нехватке места массив расширяется
+ */
 void addInstruction(LinearCode* code, InstructionType type, Operand op1, Operand op2) {
     if (!code) {
         return;
@@ -86,6 +94,7 @@ void addInstruction(LinearCode* code, InstructionType type, Operand op1, Operand
     code->instruction_count++;
 }
 
+/* Освобождение линейного кода вместе со строковыми операндами */
 void freeLinearCode(LinearCode* code) {
     int i;
 
@@ -115,6 +124,9 @@ void freeLinearCode(LinearCode* code) {
     free(code);
 }
 
+/* Создание allocator для регистров и памяти
+ * Здесь хранятся и переменные, и временные привязки полей
+ */
 RegisterAllocator* createRegisterAllocator(int max_registers, int max_memory) {
     RegisterAllocator* alloc = (RegisterAllocator*)malloc(sizeof(RegisterAllocator));
     if (!alloc) {
@@ -136,6 +148,7 @@ RegisterAllocator* createRegisterAllocator(int max_registers, int max_memory) {
     return alloc;
 }
 
+/* Выдача следующего свободного регистра */
 int allocateRegister(RegisterAllocator* alloc) {
     if (!alloc || alloc->next_register >= alloc->max_registers) {
         return -1;
@@ -143,15 +156,20 @@ int allocateRegister(RegisterAllocator* alloc) {
     return alloc->next_register++;
 }
 
+/* Заглушка для освобождения регистра */
 void freeRegister(RegisterAllocator* alloc, int reg) {
     (void)alloc;
     (void)reg;
 }
 
+/* Старый вариант выделения памяти для совместимости */
 int allocateMemory(RegisterAllocator* alloc) {
     return allocateMemorySize(alloc, 4);
 }
 
+/* Выделение памяти с учётом размера объекта
+ * Важно для user type, которые могут занимать больше 4 байт
+ */
 int allocateMemorySize(RegisterAllocator* alloc, int size_bytes) {
     int aligned_size;
     int addr;
@@ -174,6 +192,9 @@ int allocateMemorySize(RegisterAllocator* alloc, int size_bytes) {
     return addr;
 }
 
+/* Привязка имени переменной к адресу и типу
+ * Так же хранятся и обычные переменные, и поля вида c.a
+ */
 void bindVariable(RegisterAllocator* alloc, const char* var_name,
     const char* type_name, int register_id, int memory_address,
     int size_bytes, int is_argument, int is_user_type) {
@@ -206,6 +227,7 @@ void bindVariable(RegisterAllocator* alloc, const char* var_name,
     binding->constant_value = 0;
 }
 
+/* Поиск уже созданной привязки переменной по имени */
 VariableBinding* findVariableBinding(RegisterAllocator* alloc, const char* var_name) {
     int i;
 
@@ -223,6 +245,7 @@ VariableBinding* findVariableBinding(RegisterAllocator* alloc, const char* var_n
     return NULL;
 }
 
+/* Освобождение allocator и всех привязок переменных */
 void freeRegisterAllocator(RegisterAllocator* alloc) {
     int i;
 
@@ -239,10 +262,12 @@ void freeRegisterAllocator(RegisterAllocator* alloc) {
     free(alloc);
 }
 
+/* Проверка на обычное имя переменной */
 static int is_leaf_identifier(const Operation* op) {
     return op && op->op_type && strcmp(op->op_type, "IDENTIFIER") == 0;
 }
 
+/* Проверка на литерал, который можно сразу превратить в число */
 static int is_leaf_literal(const Operation* op) {
     return op && op->op_type &&
         (strcmp(op->op_type, "DEC") == 0 ||
@@ -253,6 +278,7 @@ static int is_leaf_literal(const Operation* op) {
             strcmp(op->op_type, "CHAR") == 0);
 }
 
+/* Преобразование литерала из AST/CFG в числовое значение */
 static long parse_literal_value(const Operation* op) {
     if (!op || !op->op_type) {
         return 0;
@@ -275,6 +301,7 @@ static long parse_literal_value(const Operation* op) {
     return strtol(op->value, NULL, 10);
 }
 
+/* Получение типа аргумента из сигнатуры функции */
 static const char* current_type_name_for_variable(const char* name) {
     FunctionArg* arg;
 
@@ -293,15 +320,20 @@ static const char* current_type_name_for_variable(const char* name) {
     return NULL;
 }
 
+/* Отделение user type от builtin и array */
 static int is_user_type_name(const char* type_name) {
     return type_name && !isBuiltinTypeName(type_name) &&
         strncmp(type_name, "array(", 6) != 0;
 }
 
+/* Создание привязки переменной, если она встретилась в выражении
+ * и явной привязки ещё нет
+ */
 static void ensure_variable_binding(RegisterAllocator* alloc, const char* name) {
     const char* inferred_type;
     int size_bytes;
 
+    /* если переменной ещё нет, выделяю место */
     if (!alloc || !name || !*name) {
         return;
     }
@@ -318,11 +350,15 @@ static void ensure_variable_binding(RegisterAllocator* alloc, const char* name) 
         0, is_user_type_name(inferred_type));
 }
 
+/* Вариант для случаев, где тип уже точно известен
+ * Например, на объявлении переменной или аргумента
+ */
 static void ensure_variable_binding_with_type(RegisterAllocator* alloc, const char* name,
     const char* type_name, int is_argument) {
     VariableBinding* binding;
     int size_bytes;
 
+    /* тут уже размер зависит от типа */
     if (!alloc || !name || !*name) {
         return;
     }
@@ -348,6 +384,9 @@ static void ensure_variable_binding_with_type(RegisterAllocator* alloc, const ch
         is_argument, is_user_type_name(type_name));
 }
 
+/* Расчёт адреса поля
+ * Из цепочки вроде l.start.x получается точный адрес в памяти
+ */
 static int resolve_member_address(RegisterAllocator* alloc, Operation* op,
     const char** out_type_name) {
     const char* path[32];
@@ -358,6 +397,7 @@ static int resolve_member_address(RegisterAllocator* alloc, Operation* op,
     int address;
     int i;
 
+    /* разбираю цепочку a.b.c */
     while (current && current->op_type &&
         strcmp(current->op_type, "memberAccess") == 0 &&
         path_count < 32) {
@@ -365,6 +405,7 @@ static int resolve_member_address(RegisterAllocator* alloc, Operation* op,
         current = current->left;
     }
 
+    /* внизу должна быть обычная переменная */
     if (!current || !is_leaf_identifier(current) || !current->value) {
         return -1;
     }
@@ -389,6 +430,7 @@ static int resolve_member_address(RegisterAllocator* alloc, Operation* op,
         if (!field) {
             return -1;
         }
+        /* добираю адрес по offset */
         address += field->offset;
         current_type = field->type_name;
     }
@@ -400,6 +442,9 @@ static int resolve_member_address(RegisterAllocator* alloc, Operation* op,
     return address;
 }
 
+/* Преобразование операции типа в строку
+ * Используется при объявлении переменной и расчёте её размера
+ */
 static char* type_name_from_operation(Operation* op) {
     char buffer[256];
     char* element_name;
@@ -428,6 +473,9 @@ static char* type_name_from_operation(Operation* op) {
     return strdup(op->op_type ? op->op_type : "?");
 }
 
+/* Определение типа выражения
+ * Нужен в первую очередь для вызова методов и полей
+ */
 static const char* resolve_expression_type(RegisterAllocator* alloc, Operation* op) {
     VariableBinding* binding;
     const char* field_type = NULL;
@@ -453,6 +501,9 @@ static const char* resolve_expression_type(RegisterAllocator* alloc, Operation* 
     return NULL;
 }
 
+/* Сборка строки вида c.a или l.start.x
+ * Потом это имя используется как ключ во внутренней таблице привязок
+ */
 static char* member_binding_name_from_operation(Operation* op) {
     char buffer[256];
     Operation* chain[32];
@@ -481,11 +532,15 @@ static char* member_binding_name_from_operation(Operation* op) {
     return strdup(buffer);
 }
 
+/* Создание временной привязки для поля
+ * После этого с полем можно работать почти как с обычной переменной
+ */
 static char* ensure_member_binding(RegisterAllocator* alloc, Operation* op) {
     const char* member_type = NULL;
     int member_address;
     char* binding_name;
 
+    /* делаю временную запись для поля */
     member_address = resolve_member_address(alloc, op, &member_type);
     if (member_address < 0) {
         return NULL;
@@ -504,8 +559,12 @@ static char* ensure_member_binding(RegisterAllocator* alloc, Operation* op) {
     return binding_name;
 }
 
+/* Общий генератор выражений
+ * Почти вся логика codegen сводится к рекурсивному обходу через эту функцию
+ */
 static void emit_expression(LinearCode* code, RegisterAllocator* alloc, Operation* op, int target_reg);
 
+/* Связка внутреннего имени операции с asm-инструкцией */
 static InstructionType map_binary_instr(const char* op_type) {
     if (!op_type) return INSTR_END;
     if (strcmp(op_type, "PLUS") == 0) return INSTR_ADD;
@@ -523,6 +582,7 @@ static InstructionType map_binary_instr(const char* op_type) {
     return INSTR_END;
 }
 
+/* Проверка операций сравнения */
 static int is_compare_op(const char* op_type) {
     if (!op_type) return 0;
     return strcmp(op_type, "EQUALITY") == 0 ||
@@ -533,6 +593,7 @@ static int is_compare_op(const char* op_type) {
         strcmp(op_type, "GREATERTHANEQ") == 0;
 }
 
+/* Выбор условного перехода для сравнения */
 static InstructionType jump_for_compare(const char* op_type) {
     if (strcmp(op_type, "EQUALITY") == 0) return INSTR_JEQ;
     if (strcmp(op_type, "NOTEQUAL") == 0) return INSTR_JNE;
@@ -543,6 +604,9 @@ static InstructionType jump_for_compare(const char* op_type) {
     return INSTR_JEQ;
 }
 
+/* Генерация сравнения через CMP
+ * После этого результат переводится в 0 или 1
+ */
 static void emit_compare_to_bool(LinearCode* code, const char* compare_op, int target_reg) {
     char true_lbl[64];
     char end_lbl[64];
@@ -558,7 +622,11 @@ static void emit_compare_to_bool(LinearCode* code, const char* compare_op, int t
     addInstruction(code, INSTR_LABEL, createLabelOperand(end_lbl), createConstantOperand(0));
 }
 
+/* Генерация обычного CALL
+ * Пока используется только первый аргумент
+ */
 static void emit_call(LinearCode* code, RegisterAllocator* alloc, Operation* op, int target_reg) {
+    /* пока беру только первый аргумент */
     if (op && op->right && strcmp(op->right->op_type, "optionalListExpr") == 0 &&
         op->right->left && strcmp(op->right->left->op_type, "listExpr") == 0 &&
         op->right->left->left) {
@@ -574,10 +642,14 @@ static void emit_call(LinearCode* code, RegisterAllocator* alloc, Operation* op,
     }
 }
 
+/* Генерация вызова метода
+ * Сначала определяется тип объекта слева, потом ищется полное имя метода
+ */
 static void emit_method_call(LinearCode* code, RegisterAllocator* alloc, Operation* op, int target_reg) {
     const char* object_type;
     UserTypeMethod* method;
 
+    /* сначала пытаюсь понять тип слева */
     if (!op || !op->value) {
         return;
     }
@@ -593,6 +665,7 @@ static void emit_method_call(LinearCode* code, RegisterAllocator* alloc, Operati
     }
 
     if (method && method->full_name) {
+        /* если тип найден, беру полное имя */
         addInstruction(code, INSTR_CALL, createLabelOperand(method->full_name), createConstantOperand(0));
     }
     else {
@@ -604,6 +677,9 @@ static void emit_method_call(LinearCode* code, RegisterAllocator* alloc, Operati
     }
 }
 
+/* Главный рекурсивный генератор выражений
+ * Здесь обрабатываются литералы, переменные, поля, вызовы, присваивания и бинарные операции
+ */
 static void emit_expression(LinearCode* code, RegisterAllocator* alloc, Operation* op, int target_reg) {
     char* member_binding_name;
     int temp_reg;
@@ -651,6 +727,7 @@ static void emit_expression(LinearCode* code, RegisterAllocator* alloc, Operatio
     }
 
     if (strcmp(op->op_type, "memberAccess") == 0) {
+        /* чтение поля */
         member_binding_name = ensure_member_binding(alloc, op);
         if (member_binding_name) {
             addInstruction(code, INSTR_MOV, createRegisterOperand(target_reg), createVariableOperand(member_binding_name));
@@ -680,6 +757,7 @@ static void emit_expression(LinearCode* code, RegisterAllocator* alloc, Operatio
         }
         else if (op->left && op->left->op_type &&
             strcmp(op->left->op_type, "memberAccess") == 0) {
+            /* запись в поле */
             emit_expression(code, alloc, op->right, target_reg);
             member_binding_name = ensure_member_binding(alloc, op->left);
             if (member_binding_name) {
@@ -723,10 +801,14 @@ static void emit_expression(LinearCode* code, RegisterAllocator* alloc, Operatio
     addInstruction(code, INSTR_LOAD_CONST, createRegisterOperand(target_reg), createConstantOperand(0));
 }
 
+/* Разбор объявления переменных
+ * Здесь же сразу выделяется память нужного размера для user type
+ */
 static void emit_var_decls(RegisterAllocator* alloc, Operation* type_op,
     Operation* node, LinearCode* code) {
     char* declared_type_name;
 
+    /* тут сразу выделяю память */
     if (!node) {
         return;
     }
@@ -758,9 +840,11 @@ static void emit_var_decls(RegisterAllocator* alloc, Operation* type_op,
     emit_var_decls(alloc, type_op, node->right, code);
 }
 
+/* Использование переменной r как результата функции */
 static void emit_implicit_return(LinearCode* code, RegisterAllocator* alloc) {
     VariableBinding* result_binding;
 
+    /* если есть r, считаю её результатом */
     if (!code || !alloc) {
         return;
     }
@@ -771,6 +855,7 @@ static void emit_implicit_return(LinearCode* code, RegisterAllocator* alloc) {
     }
 }
 
+/* Внутренние имена меток для последующего префикса именем функции */
 static int is_internal_label_name(const char* name) {
     if (!name) {
         return 0;
@@ -779,6 +864,7 @@ static int is_internal_label_name(const char* name) {
     return (name[0] == 'L') || strncmp(name, "cmp_", 4) == 0;
 }
 
+/* Добавление имени функции к внутренним меткам */
 static void namespace_internal_labels(CompiledFunction* compiled) {
     int i;
 
@@ -805,6 +891,7 @@ static void namespace_internal_labels(CompiledFunction* compiled) {
     }
 }
 
+/* Старый special-case для fib */
 static int is_recursive_fib_function(const Function* cfg_func) {
     return cfg_func &&
         cfg_func->signature &&
@@ -814,6 +901,9 @@ static int is_recursive_fib_function(const Function* cfg_func) {
         cfg_func->signature->args->name != NULL;
 }
 
+/* Ручная генерация fib
+ * Оставлена отдельно из старой логики проекта
+ */
 static void emit_special_fib_function(CompiledFunction* compiled) {
     if (!compiled || !compiled->code || !compiled->signature || !compiled->signature->args) {
         return;
@@ -864,6 +954,7 @@ static void emit_special_fib_function(CompiledFunction* compiled) {
     addInstruction(compiled->code, INSTR_RET, createRegisterOperand(0), createConstantOperand(0));
 }
 
+/* Генерация одной операции верхнего уровня в block */
 static void emit_operation(LinearCode* code, RegisterAllocator* alloc, Operation* op) {
     if (!code || !op) {
         return;
@@ -881,6 +972,7 @@ static void emit_operation(LinearCode* code, RegisterAllocator* alloc, Operation
     emit_expression(code, alloc, op, 0);
 }
 
+/* Поиск максимального id блока для visited-массива */
 static int max_block_id(const CFG* cfg) {
     int max_id = -1;
     BasicBlock* bb = cfg ? cfg->blocks : NULL;
@@ -893,18 +985,21 @@ static int max_block_id(const CFG* cfg) {
     return max_id;
 }
 
+/* Печать метки блока в линейный код */
 static void emit_block_label(LinearCode* code, int block_id) {
     char label[64];
     snprintf(label, sizeof(label), "L%d", block_id);
     addInstruction(code, INSTR_LABEL, createLabelOperand(label), createConstantOperand(0));
 }
 
+/* Переход в другой basic block по его номеру */
 static void emit_jump_to_block(LinearCode* code, InstructionType jump_type, const BasicBlock* target) {
     char label[64];
     snprintf(label, sizeof(label), "L%d", target->id);
     addInstruction(code, jump_type, createLabelOperand(label), createConstantOperand(0));
 }
 
+/* Обход CFG в глубину и раскладка в линейный код */
 static void generate_block_recursive(BasicBlock* block,
     LinearCode* code,
     RegisterAllocator* alloc,
@@ -943,12 +1038,16 @@ static void generate_block_recursive(BasicBlock* block,
     generate_block_recursive(block->false_target, code, alloc, visited, visited_size);
 }
 
+/* Генерация линейного кода для одной функции
+ * Здесь создаётся свой allocator, ставится имя функции и обходится её CFG
+ */
 CompiledFunction* generateCodeFromFunction(Function* cfg_func) {
     CompiledFunction* compiled;
     int max_id;
     int visited_size;
     unsigned char* visited;
 
+    /* новая функция - новый набор всего */
     if (!cfg_func || !cfg_func->cfg) {
         return NULL;
     }
@@ -986,6 +1085,7 @@ CompiledFunction* generateCodeFromFunction(Function* cfg_func) {
     if (cfg_func->signature && cfg_func->signature->args) {
         FunctionArg* arg = cfg_func->signature->args;
         if (arg && arg->name) {
+            /* первый аргумент сразу сохраняю */
             ensure_variable_binding_with_type(compiled->alloc, arg->name, arg->type, 1);
             addInstruction(compiled->code, INSTR_MOV, createVariableOperand(arg->name), createRegisterOperand(0));
         }
@@ -1020,6 +1120,7 @@ CompiledFunction* generateCodeFromFunction(Function* cfg_func) {
     return compiled;
 }
 
+/* Генерация кода сразу для всех функций программы */
 CompiledFunctionCollection* generateCodeFromAST(FunctionCollection* functions) {
     CompiledFunctionCollection* collection;
     Function* func;
@@ -1054,6 +1155,7 @@ CompiledFunctionCollection* generateCodeFromAST(FunctionCollection* functions) {
     return collection;
 }
 
+/* Освобождение одной compiled function */
 void freeCompiledFunction(CompiledFunction* func) {
     if (!func) {
         return;
@@ -1067,6 +1169,7 @@ void freeCompiledFunction(CompiledFunction* func) {
     free(func);
 }
 
+/* Освобождение всей коллекции compiled functions */
 void freeCompiledFunctionCollection(CompiledFunctionCollection* collection) {
     int i;
 

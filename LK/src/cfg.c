@@ -7,6 +7,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* Создание одного узла операции для CFG,
+ * из которых дальше собирается дерево выражения
+ */
 Operation* createOperation(char* op_type, Operation* left, Operation* right,
     const char* value, int line_number) {
     Operation* op = (Operation*)malloc(sizeof(Operation));
@@ -20,6 +23,7 @@ Operation* createOperation(char* op_type, Operation* left, Operation* right,
     return op;
 }
 
+/* Освобождение операции вместе с поддеревом и цепочкой next */
 void freeOperation(Operation* op) {
     if (!op) return;
     free(op->op_type);
@@ -30,6 +34,7 @@ void freeOperation(Operation* op) {
     free(op);
 }
 
+/* Создание basic block */
 BasicBlock* createBasicBlock(int id) {
     BasicBlock* bb = (BasicBlock*)malloc(sizeof(BasicBlock));
     if (!bb) return NULL;
@@ -44,6 +49,7 @@ BasicBlock* createBasicBlock(int id) {
     return bb;
 }
 
+/* Добавление операции в конец списка блока */
 void addOperationToBlock(BasicBlock* block, Operation* op) {
     if (!block || !op) return;
     if (!block->operations) {
@@ -57,6 +63,7 @@ void addOperationToBlock(BasicBlock* block, Operation* op) {
     }
 }
 
+/* Освобождение блока и его операций */
 void freeBasicBlock(BasicBlock* block) {
     if (!block) return;
     freeOperation(block->operations);
@@ -65,6 +72,7 @@ void freeBasicBlock(BasicBlock* block) {
 
 // CFG
 
+/* Создание пустого CFG для функции или метода */
 CFG* createCFG(void) {
     CFG* cfg = (CFG*)malloc(sizeof(CFG));
     if (!cfg) return NULL;
@@ -75,6 +83,7 @@ CFG* createCFG(void) {
     return cfg;
 }
 
+/* Добавление блока в общий список CFG */
 void addBlockToCFG(CFG* cfg, BasicBlock* block) {
     if (!cfg || !block) return;
     block->next = cfg->blocks;
@@ -82,6 +91,7 @@ void addBlockToCFG(CFG* cfg, BasicBlock* block) {
     cfg->block_count++;
 }
 
+/* Полное освобождение CFG */
 void freeCFG(CFG* cfg) {
     if (!cfg) return;
     BasicBlock* cur = cfg->blocks;
@@ -93,6 +103,7 @@ void freeCFG(CFG* cfg) {
     free(cfg);
 }
 
+/* Создание пустой таблицы типов */
 TypeCollection* createTypeCollection(void) {
     TypeCollection* collection = (TypeCollection*)malloc(sizeof(TypeCollection));
     if (!collection) return NULL;
@@ -101,6 +112,7 @@ TypeCollection* createTypeCollection(void) {
     return collection;
 }
 
+/* Добавление пользовательского типа в общую таблицу */
 void addTypeToCollection(TypeCollection* collection, UserType* type_info) {
     if (!collection || !type_info) return;
     type_info->next = collection->types;
@@ -108,11 +120,13 @@ void addTypeToCollection(TypeCollection* collection, UserType* type_info) {
     collection->type_count++;
 }
 
+/* Поиск типа по имени */
 UserType* findUserType(TypeCollection* collection, const char* type_name) {
     UserType* current;
 
     if (!collection || !type_name) return NULL;
 
+    /* поиск типа по имени */
     current = collection->types;
     while (current) {
         if (current->name && strcmp(current->name, type_name) == 0) {
@@ -123,6 +137,7 @@ UserType* findUserType(TypeCollection* collection, const char* type_name) {
     return NULL;
 }
 
+/* Поиск поля в типе и его базовых типах */
 UserTypeField* findUserTypeField(TypeCollection* collection, const char* type_name,
     const char* field_name) {
     UserType* type_info;
@@ -148,6 +163,7 @@ UserTypeField* findUserTypeField(TypeCollection* collection, const char* type_na
     return NULL;
 }
 
+/* Поиск метода в типе и его базовых типах */
 UserTypeMethod* findUserTypeMethod(TypeCollection* collection, const char* type_name,
     const char* method_name) {
     UserType* type_info;
@@ -173,6 +189,7 @@ UserTypeMethod* findUserTypeMethod(TypeCollection* collection, const char* type_
     return NULL;
 }
 
+/* Проверка на встроенный тип */
 int isBuiltinTypeName(const char* type_name) {
     if (!type_name) return 0;
     return strcmp(type_name, "byte") == 0 ||
@@ -185,6 +202,9 @@ int isBuiltinTypeName(const char* type_name) {
         strcmp(type_name, "string") == 0;
 }
 
+/* Определение размера типа в памяти
+ * Для user type используется уже посчитанный size_bytes
+ */
 int getTypeStorageSize(TypeCollection* collection, const char* type_name) {
     UserType* user_type;
 
@@ -215,6 +235,7 @@ int getTypeStorageSize(TypeCollection* collection, const char* type_name) {
     return 4;
 }
 
+/* Освобождение всей таблицы типов */
 void freeTypeCollection(TypeCollection* collection) {
     UserType* current;
 
@@ -253,6 +274,9 @@ void freeTypeCollection(TypeCollection* collection) {
     free(collection);
 }
 
+/* Создание описания одной функции
+ * Здесь же хранится ссылка на таблицу типов
+ */
 Function* createFunction(FunctionSignature* signature, CFG* cfg,
     const char* source_file, const char* owner_type_name,
     int is_method, TypeCollection* types) {
@@ -268,6 +292,7 @@ Function* createFunction(FunctionSignature* signature, CFG* cfg,
     return f;
 }
 
+/* Освобождение одной функции */
 void freeFunction(Function* func) {
     if (!func) return;
     if (func->signature) {
@@ -289,6 +314,7 @@ void freeFunction(Function* func) {
     free(func);
 }
 
+/* Создание списка входных файлов */
 FileCollection* createFileCollection(void) {
     FileCollection* fc = (FileCollection*)malloc(sizeof(FileCollection));
     if (!fc) return NULL;
@@ -297,6 +323,7 @@ FileCollection* createFileCollection(void) {
     return fc;
 }
 
+/* Добавление файла и его AST в общий список */
 void addFileToCollection(FileCollection* collection, const char* filename,
     Node* ast) {
     if (!collection) return;
@@ -309,6 +336,7 @@ void addFileToCollection(FileCollection* collection, const char* filename,
     collection->file_count++;
 }
 
+/* Создание пустой коллекции функций */
 FunctionCollection* createFunctionCollection(void) {
     FunctionCollection* fc = (FunctionCollection*)malloc(sizeof(FunctionCollection));
     if (!fc) return NULL;
@@ -317,6 +345,7 @@ FunctionCollection* createFunctionCollection(void) {
     return fc;
 }
 
+/* Добавление функции в общий список результатов */
 void addFunctionToCollection(FunctionCollection* collection, Function* func) {
     if (!collection || !func) return;
     func->next = collection->functions;
@@ -324,6 +353,7 @@ void addFunctionToCollection(FunctionCollection* collection, Function* func) {
     collection->function_count++;
 }
 
+/* Создание пустой коллекции ошибок */
 ErrorCollection* createErrorCollection(void) {
     ErrorCollection* ec = (ErrorCollection*)malloc(sizeof(ErrorCollection));
     if (!ec) return NULL;
@@ -332,6 +362,7 @@ ErrorCollection* createErrorCollection(void) {
     return ec;
 }
 
+/* Добавление ошибки в список */
 void addErrorToCollection(ErrorCollection* collection, const char* message,
     const char* filename, int line_number) {
     if (!collection) return;
@@ -345,6 +376,9 @@ void addErrorToCollection(ErrorCollection* collection, const char* message,
     collection->error_count++;
 }
 
+/* Сборка итога анализа в один объект
+ * Функции, ошибки и таблица типов
+ */
 AnalysisResult* createAnalysisResult(FunctionCollection* functions,
     ErrorCollection* errors, TypeCollection* types) {
     AnalysisResult* ar = (AnalysisResult*)malloc(sizeof(AnalysisResult));
@@ -355,6 +389,7 @@ AnalysisResult* createAnalysisResult(FunctionCollection* functions,
     return ar;
 }
 
+/* Освобождение всего результата анализа */
 void freeAnalysisResult(AnalysisResult* result) {
     if (!result) return;
     if (result->functions) {
@@ -391,16 +426,21 @@ typedef struct BuildCtx {
     int              break_depth;
 } BuildCtx;
 
+/* Создание нового блока и добавление его в CFG */
 static BasicBlock* newBlock(BuildCtx* ctx) {
     BasicBlock* bb = createBasicBlock(ctx->block_id_counter++);
     addBlockToCFG(ctx->cfg, bb);
     return bb;
 }
 
+/* Преобразование AST-узла типа в строку
+ * Используется для полей, аргументов и return type
+ */
 static char* buildTypeNameFromNode(Node* node) {
     char buffer[256];
     char* element_name;
 
+    /* делаю строку с именем типа */
     if (!node) return strdup("?");
 
     if (node->value && *node->value &&
@@ -429,7 +469,9 @@ static char* buildTypeNameFromNode(Node* node) {
     return strdup("?");
 }
 
-/* Превратить узел AST-выражения в дерево операций */
+/* Преобразование AST-выражения в дерево операций для CFG
+ * Такой вид уже подходит для codegen
+ */
 static Operation* exprToOp(Node* node) {
     if (!node) return NULL;
 
@@ -437,6 +479,7 @@ static Operation* exprToOp(Node* node) {
     const char* v = node->value ? node->value : "";
 
     /* Листья: литералы, идентификаторы */
+    /* эти штуки нужны дальше в codegen */
     if (strcmp(t, "IDENTIFIER") == 0 ||
         strcmp(t, "DEC") == 0 ||
         strcmp(t, "HEX") == 0 ||
@@ -464,14 +507,11 @@ static Operation* exprToOp(Node* node) {
     return op;
 }
 
-/*
- * current  — текущий (активный) базовый блок, в который пишем инструкции
- * Возвращает блок, который является «выходом» из данного поддерева —
- * after_block — блок, который следует после всей конструкции (для break)
- */
+/* Объявление внутренних функций для разбора тела и сборки CFG */
 static BasicBlock* buildBlock(BuildCtx* ctx, Node* node,
     BasicBlock* current, BasicBlock* after_block);
 
+/* Обход списка statement/sourceItem и добавление в CFG */
 static BasicBlock* buildList(BuildCtx* ctx, Node* node,
     BasicBlock* current, BasicBlock* after_block) {
     if (!node) return current;
@@ -485,6 +525,9 @@ static BasicBlock* buildList(BuildCtx* ctx, Node* node,
     return buildBlock(ctx, node, current, after_block);
 }
 
+/* Главная функция разбора тела в CFG
+ * Отдельно обрабатываются var, assignment, if, loop, break и block
+ */
 static BasicBlock* buildBlock(BuildCtx* ctx, Node* node,
     BasicBlock* current, BasicBlock* after_block) {
     if (!node || !current) return current;
@@ -679,12 +722,14 @@ static BasicBlock* buildBlock(BuildCtx* ctx, Node* node,
     return current;
 }
 
+/* Добавление поля в тип без расчёта offset */
 static void addTypeField(UserType* type_info, const char* field_name,
     const char* field_type_name) {
     UserTypeField* field;
 
     if (!type_info || !field_name) return;
 
+    /* добавляю поле в список */
     field = (UserTypeField*)malloc(sizeof(UserTypeField));
     if (!field) return;
 
@@ -704,12 +749,16 @@ static void addTypeField(UserType* type_info, const char* field_name,
     }
 }
 
+/* Добавление метода в тип
+ * Сохраняется полное имя для asm и AST узел для будущей сборки CFG
+ */
 static void addTypeMethod(UserType* type_info, const char* method_name,
     const char* full_name, const char* return_type, Node* ast_node) {
     UserTypeMethod* method;
 
     if (!type_info || !method_name || !full_name) return;
 
+    /* храню и короткое, и полное имя */
     method = (UserTypeMethod*)malloc(sizeof(UserTypeMethod));
     if (!method) return;
 
@@ -729,6 +778,7 @@ static void addTypeMethod(UserType* type_info, const char* method_name,
     }
 }
 
+/* Сбор всех верхнеуровневых def из AST файла */
 static void collectSourceItems(Node* node, Node** items, int* count, int max) {
     if (!node) return;
     if (node->type && strcmp(node->type, "source") == 0) {
@@ -740,6 +790,7 @@ static void collectSourceItems(Node* node, Node** items, int* count, int max) {
     }
 }
 
+/* Сбор всех typeDecl из AST файла */
 static void collectTypeDecls(Node* node, Node** items, int* count, int max) {
     if (!node) return;
     if (node->type && strcmp(node->type, "source") == 0) {
@@ -751,9 +802,11 @@ static void collectTypeDecls(Node* node, Node** items, int* count, int max) {
     }
 }
 
+/* Сбор полей и методов из одного typeDecl */
 static void collectTypeMembers(UserType* type_info, Node* node) {
     if (!type_info || !node) return;
 
+    /* список членов идёт цепочкой */
     if (node->type && strcmp(node->type, "listTypeMember") == 0) {
         collectTypeMembers(type_info, node->left);
         collectTypeMembers(type_info, node->right);
@@ -771,6 +824,7 @@ static void collectTypeMembers(UserType* type_info, Node* node) {
     if (node->type && strcmp(node->type, "methodDecl") == 0 && node->left) {
         char full_name[256];
         char* return_type_name = buildTypeNameFromNode(node->left->right);
+        /* такое имя потом удобнее в asm */
         snprintf(full_name, sizeof(full_name), "%s__%s",
             type_info->name ? type_info->name : "type",
             node->left->value ? node->left->value : "method");
@@ -781,6 +835,7 @@ static void collectTypeMembers(UserType* type_info, Node* node) {
     }
 }
 
+/* Преобразование AST объявления type в структуру UserType */
 static UserType* buildTypeFromDecl(Node* type_decl, ErrorCollection* errors,
     const char* filename) {
     UserType* type_info;
@@ -788,6 +843,7 @@ static UserType* buildTypeFromDecl(Node* type_decl, ErrorCollection* errors,
 
     if (!type_decl || !type_decl->left) return NULL;
 
+    /* из AST делаю UserType */
     header = type_decl->left;
     type_info = (UserType*)malloc(sizeof(UserType));
     if (!type_info) return NULL;
@@ -812,11 +868,17 @@ static UserType* buildTypeFromDecl(Node* type_decl, ErrorCollection* errors,
     return type_info;
 }
 
+/* Расчёт layout типов
+ * Вычисление размера типа и смещений его полей
+ * При наличии базового типа свои поля идут после него
+ * Для поля user type сначала считается размер вложенного типа
+ */
 static int resolveUserTypeLayout(TypeCollection* types, UserType* type_info,
     ErrorCollection* errors, const char* filename) {
     int offset = 0;
     UserTypeField* field;
 
+    /* считаю размер типа и offsets полей */
     if (!type_info) return 0;
     if (type_info->resolved) return 1;
 
@@ -835,6 +897,7 @@ static int resolveUserTypeLayout(TypeCollection* types, UserType* type_info,
                 filename, 0);
         }
         else {
+            /* сначала база */
             resolveUserTypeLayout(types, base_type, errors, filename);
             offset = base_type->size_bytes;
         }
@@ -850,6 +913,7 @@ static int resolveUserTypeLayout(TypeCollection* types, UserType* type_info,
                 filename, 0);
         }
 
+        /* если поле тоже user type, сначала считаю его */
         if (field->type_name &&
             !isBuiltinTypeName(field->type_name) &&
             strncmp(field->type_name, "array(", 6) != 0) {
@@ -863,6 +927,7 @@ static int resolveUserTypeLayout(TypeCollection* types, UserType* type_info,
             }
         }
 
+        /* тут уже можно сдвигать offset */
         field_size = getTypeStorageSize(types, field->type_name);
         field->offset = offset;
         offset += field_size;
@@ -875,6 +940,7 @@ static int resolveUserTypeLayout(TypeCollection* types, UserType* type_info,
     return 1;
 }
 
+/* Запуск расчёта layout для всех типов */
 static void resolveAllUserTypes(TypeCollection* types, ErrorCollection* errors,
     const char* filename) {
     UserType* current;
@@ -888,6 +954,7 @@ static void resolveAllUserTypes(TypeCollection* types, ErrorCollection* errors,
     }
 }
 
+/* Преобразование AST сигнатуры в FunctionSignature */
 static FunctionSignature* buildSignatureFromNode(Node* sig_node,
     const char* name_override) {
     FunctionSignature* sig;
@@ -936,6 +1003,9 @@ static FunctionSignature* buildSignatureFromNode(Node* sig_node,
     return sig;
 }
 
+/* Сборка CFG одной функции из def или methodDecl
+ * Используется и для обычных функций, и для методов типа
+ */
 static Function* buildFunctionCFG(Node* source_item, const char* filename,
     ErrorCollection* errors, TypeCollection* types,
     const char* owner_type_name, const char* name_override, int is_method) {
@@ -948,6 +1018,7 @@ static Function* buildFunctionCFG(Node* source_item, const char* filename,
     BasicBlock* last;
     BasicBlock* exit_block;
 
+    /* и для def, и для методов */
     if (!source_item) return NULL;
 
     sig_node = source_item->left;
@@ -990,6 +1061,11 @@ static Function* buildFunctionCFG(Node* source_item, const char* filename,
     return createFunction(sig, cfg, filename, owner_type_name, is_method, types);
 }
 
+/* Общий вход в модуль CFG
+ * Сначала собираются все типы
+ * Потом считается их layout
+ * Потом отдельно строится CFG обычных функций и методов
+ */
 AnalysisResult* buildCFGFromAST(FileCollection* file_collection) {
     FunctionCollection* funcs = createFunctionCollection();
     ErrorCollection* errors = createErrorCollection();
@@ -1000,6 +1076,7 @@ AnalysisResult* buildCFGFromAST(FileCollection* file_collection) {
         return createAnalysisResult(funcs, errors, types);
     }
 
+    /* сначала собираю все type */
     {
         FileInfo* fi = file_collection->files;
         while (fi) {
@@ -1039,6 +1116,7 @@ AnalysisResult* buildCFGFromAST(FileCollection* file_collection) {
                 continue;
             }
 
+            /* обычные функции */
             {
                 Node* items[256];
                 int item_count = 0;
@@ -1051,6 +1129,7 @@ AnalysisResult* buildCFGFromAST(FileCollection* file_collection) {
                 }
             }
 
+            /* методы типа как отдельные функции */
             {
                 Node* type_items[256];
                 int type_count = 0;

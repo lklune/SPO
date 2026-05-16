@@ -97,6 +97,7 @@ void yyerror(const char *s);  // �������� ������� 
 
 %%
 
+/* верхний уровень файла */
 source: 
       { $$ = NULL; }
     | source sourceItem { 
@@ -108,6 +109,7 @@ sourceItem:
       DEF funcSignature listStatement END { 
           $$ = createNode("sourceItem", $2, $3, NULL); 
       }
+    /* type рядом с def */
     | typeDecl { $$ = $1; }
     ;
 
@@ -117,9 +119,11 @@ listSourceItem:
     ;
 
 typeDecl:
+      /* type ... begin ... end */
       TYPE IDENTIFIER optionalBaseType BEGIN_BLOCK listTypeMember END {
           $$ = createNode("typeDecl", createNode("typeHeader", $3, NULL, $2 ? $2->value : NULL), $5, NULL);
       }
+    /* И на всякий случай оставляю такой же вариант через фигурные скобки. */
     | TYPE IDENTIFIER optionalBaseType LBRACE listTypeMember RBRACE {
           $$ = createNode("typeDecl", createNode("typeHeader", $3, NULL, $2 ? $2->value : NULL), $5, NULL);
       }
@@ -127,6 +131,7 @@ typeDecl:
 
 optionalBaseType:
       { $$ = NULL; }
+    /* of Base */
     | OF IDENTIFIER { $$ = $2; }
     ;
 
@@ -136,17 +141,20 @@ listTypeMember:
     ;
 
 typeMember:
+      /* поле или метод */
       fieldDecl { $$ = $1; }
     | methodDecl { $$ = $1; }
     ;
 
 fieldDecl:
+      /* поле */
       typeRef IDENTIFIER SEMICOLON {
           $$ = createNode("fieldDecl", $1, NULL, $2 ? $2->value : NULL);
       }
     ;
 
 methodDecl:
+      /* метод внутри type */
       DEF funcSignature listStatement END {
           $$ = createNode("methodDecl", $2, $3, NULL);
       }
@@ -178,6 +186,7 @@ optionalTypeRef:
 /* TypeRef */
 
 typeRef: 
+      /* любой вид типа */
       builtin { $$ = $1; }
     | custom { $$ = $1; }
     | array { $$ = $1; }
@@ -252,7 +261,9 @@ expr: unary { $$ = $1; }
     | binary { $$ = $1; }
     | braces { $$ = $1; }
     | call { $$ = $1; }
+    /* вызов метода */
     | methodCall { $$ = $1; }
+    /* доступ к полю */
     | memberAccess { $$ = $1; }
     | slice { $$ = $1; }
     | place { $$ = $1; }
@@ -284,6 +295,7 @@ braces: LPAREN expr RPAREN { $$ = createNode("braces", $2, NULL, NULL); };
 
 call: IDENTIFIER LPAREN optionalListExpr RPAREN { $$ = createNode("CALL", $1, $3, NULL); };
 
+/* вызов через точку */
 methodCall: place DOT IDENTIFIER LPAREN optionalListExpr RPAREN {
         $$ = createNode("METHOD_CALL", $1, $5, $3 ? $3->value : NULL);
     }
@@ -291,6 +303,7 @@ methodCall: place DOT IDENTIFIER LPAREN optionalListExpr RPAREN {
         $$ = createNode("METHOD_CALL", $1, $5, $3 ? $3->value : NULL);
     };
 
+/* цепочка a.b.c */
 memberAccess: place DOT IDENTIFIER {
         $$ = createNode("memberAccess", $1, NULL, $3 ? $3->value : NULL);
     }
@@ -324,6 +337,7 @@ literal: TRUE { $$ = $1; }
 
 /* VAR */
 
+/* объявление переменных */
 listVarDeclared: listVarDeclaredItem COMMA listVarDeclared { $$ = createNode("listVarDeclared", $1, $3, NULL); }
     | listVarDeclaredItem { $$ = createNode("listVarDeclared", $1, NULL, NULL); };
 

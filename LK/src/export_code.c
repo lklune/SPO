@@ -4,7 +4,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* Поиск привязки переменной для получения адреса в памяти */
 static VariableBinding* findBindingByName(RegisterAllocator* alloc, const char* name) {
+    /* ищу переменную по имени */
     if (!alloc || !name) {
         return NULL;
     }
@@ -19,6 +21,9 @@ static VariableBinding* findBindingByName(RegisterAllocator* alloc, const char* 
     return NULL;
 }
 
+/* Преобразование внутреннего операнда в текст для asm-экспорта
+ * Для переменной подставляется не имя, а адрес
+ */
 static void formatAsmOperand(Operand* operand,
     RegisterAllocator* alloc,
     char* buffer,
@@ -41,6 +46,7 @@ static void formatAsmOperand(Operand* operand,
         break;
     case OPERAND_VARIABLE:
     {
+        /* в asm тут уже нужен адрес */
         VariableBinding* binding = findBindingByName(alloc, operand->value.name);
         if (binding && binding->memory_address >= 0) {
             snprintf(buffer, (size_t)buffer_size, "%d", binding->memory_address);
@@ -59,6 +65,9 @@ static void formatAsmOperand(Operand* operand,
     }
 }
 
+/* Печать одной asm-инструкции
+ * Внутренние MOV для переменных здесь превращаются в LD/ST
+ */
 static void printAsmInstruction(FILE* f, Instruction* instr, RegisterAllocator* alloc) {
     char op1[256] = "";
     char op2[256] = "";
@@ -78,6 +87,7 @@ static void printAsmInstruction(FILE* f, Instruction* instr, RegisterAllocator* 
 
     switch (instr->type) {
     case INSTR_MOV:
+        /* здесь MOV превращается в LD или ST */
         if (instr->operand1.type == OPERAND_VARIABLE && instr->operand2.type == OPERAND_REGISTER) {
             fprintf(f, "ST %s, %s\n", op2, op1);
         }
@@ -198,6 +208,9 @@ static void printAsmInstruction(FILE* f, Instruction* instr, RegisterAllocator* 
     }
 }
 
+/* Определение количества операндов у инструкции
+ * Нужно для печати readable linear code
+ */
 static int instructionOperandCount(InstructionType type) {
     switch (type) {
     case INSTR_END:
@@ -224,6 +237,7 @@ static int instructionOperandCount(InstructionType type) {
     }
 }
 
+/* Возврат текстового имени инструкции */
 const char* instructionToMnemonic(InstructionType type) {
     switch (type) {
     case INSTR_MOV:         return "MOV";
@@ -263,6 +277,7 @@ const char* instructionToMnemonic(InstructionType type) {
     }
 }
 
+/* Вывод операнда в текстовом виде */
 void operandToString(Operand* operand, char* buffer, int buffer_size) {
     if (!operand || !buffer || buffer_size <= 0) {
         return;
@@ -288,6 +303,7 @@ void operandToString(Operand* operand, char* buffer, int buffer_size) {
     }
 }
 
+/* Печать одной инструкции в человекочитаемом linear-code формате */
 static void printInstruction(FILE* f, Instruction* instr) {
     char op1[256] = "";
     char op2[256] = "";
@@ -306,11 +322,15 @@ static void printInstruction(FILE* f, Instruction* instr) {
     fprintf(f, "\n");
 }
 
+/* Добавление runtime в конец общей asm-программы
+ * Это стандартные подпрограммы проекта
+ */
 static void appendRuntime(FILE* f) {
     if (!f) {
         return;
     }
 
+    /* в конце добавляю runtime */
     fprintf(f, "\nreadByte:\n");
     fprintf(f, "\tIN r0\n");
     fprintf(f, "\tRET\n");
@@ -499,6 +519,7 @@ static void appendRuntime(FILE* f) {
 
 }
 
+/* Экспорт одной функции в отдельный .linear_code.txt */
 void exportCompiledFunction(CompiledFunction* func, const char* filepath) {
     if (!func || !filepath) {
         return;
@@ -518,11 +539,13 @@ void exportCompiledFunction(CompiledFunction* func, const char* filepath) {
     fclose(f);
 }
 
+/* Экспорт всех функций по отдельным файлам */
 void exportAllCompiledFunctions(CompiledFunctionCollection* collection, const char* output_directory) {
     if (!collection || !output_directory) {
         return;
     }
 
+    /* отдельный файл на каждую функцию */
     for (int i = 0; i < collection->function_count; i++) {
         CompiledFunction* func = &collection->functions[i];
         const char* func_name = (func->signature && func->signature->name) ? func->signature->name : "unknown";
@@ -534,6 +557,9 @@ void exportAllCompiledFunctions(CompiledFunctionCollection* collection, const ch
     }
 }
 
+/* Общий экспорт всей программы в один program.asm
+ * Сначала идёт описание user type, потом старт, функции и runtime
+ */
 void exportProgramAsm(AnalysisResult* result,
     CompiledFunctionCollection* collection, const char* filepath) {
     if (!collection || !filepath) {
@@ -552,6 +578,7 @@ void exportProgramAsm(AnalysisResult* result,
         UserType* type_info = result->types->types;
         while (type_info) {
             UserTypeField* field = type_info->fields;
+            /* кратко печатаю типы и поля */
             fprintf(f, "; .type %s", type_info->name ? type_info->name : "?");
             if (type_info->base_type_name && *type_info->base_type_name) {
                 fprintf(f, " of %s", type_info->base_type_name);
@@ -597,6 +624,7 @@ void exportProgramAsm(AnalysisResult* result,
     fclose(f);
 }
 
+/* Старый ручной экспорт калькулятора как отдельный шаблон */
 void exportCalculatorProgramAsm(const char* filepath) {
     static const char* program_text =
         "[section code_ram]\n"
@@ -977,6 +1005,9 @@ void exportCalculatorProgramAsm(const char* filepath) {
     fclose(f);
 }
 
+/* Экспорт всех compiled functions в один текстовый файл
+ * Отладочный вариант для быстрого просмотра всего сразу
+ */
 void exportCompiledFunctionsToSingleFile(CompiledFunctionCollection* collection, const char* filepath) {
     if (!collection || !filepath) {
         return;

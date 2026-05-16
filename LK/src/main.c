@@ -16,6 +16,7 @@ extern int   yyparse(void);
 extern Node** allNodes;
 extern size_t allNodesCount;
 
+/* Получение имени файла без пути и расширения */
 static void basename_noext(const char* path, char* out, int out_size) {
     const char* p = path;
     const char* last_sep = NULL;
@@ -28,6 +29,7 @@ static void basename_noext(const char* path, char* out, int out_size) {
     if (dot) *dot = '\0';
 }
 
+/* Получение директории из пути */
 static void dirname_of(const char* path, char* out, int out_size) {
     strncpy(out, path, out_size - 1);
     out[out_size - 1] = '\0';
@@ -38,6 +40,9 @@ static void dirname_of(const char* path, char* out, int out_size) {
     else          strncpy(out, ".", out_size);
 }
 
+/* Разбор одного входного файла
+ * Если парсер не собрал AST, возвращается NULL
+ */
 static Node* parseFile(const char* filename) {
     size_t before = allNodesCount;
     FILE* input_file = fopen(filename, "r");
@@ -59,6 +64,9 @@ static Node* parseFile(const char* filename) {
     return allNodes[allNodesCount - 1];
 }
 
+/* Основной вход компилятора
+ * Здесь читаются файлы, строится CFG, генерируется код и экспортируются результаты
+ */
 int main(int argc, char* argv[]) {
     if (argc < 2) {
         fprintf(stderr, "Usage: %s [-o <outdir>] <file1> [file2 ...]\n", argv[0]);

@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* Простое экранирование строк для dot-файла */
 static void esc(FILE* f, const char* s) {
     if (!s) return;
     for (; *s; s++) {
@@ -13,10 +14,14 @@ static void esc(FILE* f, const char* s) {
     }
 }
 
+/* Перевод внутренней операции в текст
+ * Нужен для более понятного вида CFG на картинке
+ */
 static void opStr(Operation* op, char* buf, int sz) {
     if (!op) { buf[0] = '\0'; return; }
     const char* t = op->op_type ? op->op_type : "";
     const char* v = op->value ? op->value : "";
+    /* делаю более читаемый текст для dot */
     if (strcmp(t, "IDENTIFIER") == 0 || strcmp(t, "DEC") == 0 || strcmp(t, "HEX") == 0 ||
         strcmp(t, "BIN") == 0 || strcmp(t, "STR") == 0 || strcmp(t, "CHAR") == 0 ||
         strcmp(t, "TRUE") == 0 || strcmp(t, "FALSE") == 0) {
@@ -59,6 +64,7 @@ static void opStr(Operation* op, char* buf, int sz) {
     else         buf[0] = '\0';
 }
 
+/* Сбор подписи одного basic block из всех его операций */
 static void bbLabel(BasicBlock* bb, char* buf, int sz) {
     buf[0] = '\0';
     Operation* op = bb->operations;
@@ -76,6 +82,9 @@ static void bbLabel(BasicBlock* bb, char* buf, int sz) {
 /* --- AST кластер --- */
 static int ast_cnt = 0;
 
+/* Рисование одного AST-узла внутри кластера
+ * Используется только в dot-экспорте
+ */
 static int drawAstNode(FILE* f, Node* node) {
     if (!node) return -1;
     int id = ast_cnt++;
@@ -95,6 +104,7 @@ static int drawAstNode(FILE* f, Node* node) {
     return id;
 }
 
+/* Рисование отдельного AST-кластера для одного basic block */
 static void drawAstCluster(FILE* f, int bb_id, Node* ast) {
     if (!ast) return;
     fprintf(f, "  subgraph cluster_ast_%d {\n", bb_id);
@@ -104,12 +114,12 @@ static void drawAstCluster(FILE* f, int bb_id, Node* ast) {
     fprintf(f, "  }\n");
 }
 
-/*
- * Пометить все блоки, достижимые из entry, с помощью обхода в глубину.
- * Используется для исключения «мёртвых» блоков из экспорта. // правда так и не работает как задумывалось
+/* Пометка только достижимых блоков
+ * Нужна, чтобы не тащить в dot мёртвые куски
  */
 #define MAX_BLOCKS 4096
 
+/* Обычный DFS по CFG */
 static void markReachable(BasicBlock* bb, int* visited, int max_id) {
     if (!bb || bb->id < 0 || bb->id >= max_id) return;
     if (visited[bb->id]) return;
@@ -118,10 +128,8 @@ static void markReachable(BasicBlock* bb, int* visited, int max_id) {
     markReachable(bb->false_target, visited, max_id);
 }
 
-/*
- * Возвращает 1, если CFG тривиален: только ENTRY и EXIT,
- * соединённые прямым ребром (нет никакого реального кода).
- * Такие CFG не нужно экспортировать в .dot.
+/* Проверка совсем пустого CFG
+ * Если есть только вход и выход, отдельный dot не нужен
  */
 static int isTrivialCFG(CFG* cfg) {
     if (!cfg || !cfg->entry_block) return 0;
@@ -132,6 +140,9 @@ static int isTrivialCFG(CFG* cfg) {
     return entry->true_target->is_exit ? 1 : 0;
 }
 
+/* Экспорт одной функции в dot
+ * Здесь рисуются только живые блоки и связи между ними
+ */
 void exportCFGToDot(Function* func, const char* filepath) {
     if (!func || !func->cfg) return;
 
@@ -224,6 +235,9 @@ void exportCFGToDot(Function* func, const char* filepath) {
     fclose(f);
 }
 
+/* Замена короткого имени метода на полное
+ * Например, ping -> Counter__ping
+ */
 static const char* resolveMethodGraphName(FunctionCollection* functions,
     const char* method_name) {
     Function* func;
@@ -232,6 +246,7 @@ static const char* resolveMethodGraphName(FunctionCollection* functions,
     char suffix[256];
     size_t suffix_len;
 
+    /* если могу, разворачиваю имя метода */
     if (!method_name || !functions) {
         return method_name;
     }
@@ -256,9 +271,11 @@ static const char* resolveMethodGraphName(FunctionCollection* functions,
     return matches == 1 ? resolved : method_name;
 }
 
+/* Сбор вызовов функций из дерева операций */
 static void collectCalls(Operation* op, FunctionCollection* functions,
     char** calls, int* cnt, int max) {
     if (!op) return;
+    /* обычный вызов как есть, метод стараюсь развернуть */
     if (op->op_type && strcmp(op->op_type, "CALL") == 0)
         if (op->left && op->left->value && *cnt < max)
             calls[(*cnt)++] = op->left->value;
@@ -269,6 +286,7 @@ static void collectCalls(Operation* op, FunctionCollection* functions,
     collectCalls(op->right, functions, calls, cnt, max);
 }
 
+/* Обход всех блоков CFG и сбор вызовов */
 static void collectCallsFromCFG(CFG* cfg, FunctionCollection* functions,
     char** calls, int* cnt, int max) {
     if (!cfg) return;
@@ -283,11 +301,13 @@ static void collectCallsFromCFG(CFG* cfg, FunctionCollection* functions,
     }
 }
 
+/* Построение dot-графа вызовов между функциями и методами */
 void exportCallGraphToDot(FunctionCollection* functions, const char* filepath) {
     if (!functions) return;
     FILE* f = fopen(filepath, "w");
     if (!f) { fprintf(stderr, "Cannot open: %s\n", filepath); return; }
 
+    /* сначала узлы, потом связи */
     fprintf(f, "digraph CallGraph {\n");
     fprintf(f, "  graph [label=\"Call Graph\", fontsize=14];\n");
     fprintf(f, "  node  [shape=box, style=filled, fillcolor=lightblue, fontname=\"Courier\"];\n\n");
