@@ -5,13 +5,18 @@
 -- локальные переменные и аргументы
 -- арифметические выражения
 -- ветвления и циклы
+-- генерация AST
 -- генерация CFG
+-- генерация графа вызовов
 -- генерация линейного кода
 -- генерация итогового `program.asm`
 -- пользовательские типы
--- наследование полей
+-- наследование полей через `of`
 -- вложенные пользовательские типы
 -- методы пользовательских типов
+-- интерфейсы
+-- `implements`
+-- проверка переопределения методов по полной сигнатуре
 
 
 Что нужно для сборки
@@ -24,47 +29,81 @@
 
 Сборка
 Генерация парсера выполняется автоматически во время сборки
-make rebuild    -- команда очищает старые объектные файлы, заново собирает парсер и собирает bin/run_compiler
-make tests      -- проверка всех тестов
+make rebuild          -- команда очищает старые объектные файлы, заново собирает парсер и собирает `bin/run_compiler`
+make tests            -- проверка всех тестов
 
-В результате выполнения make tests должны появиться каталоги с результатами:
+
+Основные команды
+make run-input        -- прогон `test_input/input.txt`
+make run-calc         -- компиляция `calc.src` и сохранение результата в `generated/calc`
+make test             -- базовый тест пользовательских типов и наследования полей
+make test-nested      -- тест вложенных пользовательских типов
+make test-method      -- тест методов пользовательских типов
+make test-interface   -- тест интерфейсов, `implements` и переопределения
+make tests            -- полный прогон всех основных проверок
+make vm-run           -- запуск калькулятора на VM
+
+
+В результате выполнения `make tests` должны появиться каталоги с результатами
 -- generated/input
 -- generated/calc
 -- generated/test_basic
 -- generated/test_nested
 -- generated/test_method
-
-make test           -- базовый тест пользовательских типов и наследования полей
-make test-nested    -- тест вложенных пользовательских типов
-make test-method    -- тест методов пользовательских типов
- 
-
-Калькулятор:
-make run-calc       -- компиляция calc.src и сохранение результата в generated/calc
-make vm-run         -- запуск калькулятора на VM
+-- generated/test_interface
 
 
 AST и картинки
-После запуска компилятора автоматически создаются:
--- *.ast.json
--- *.ast.dot
--- *.ast.png если установлен graphviz dot
-
-dot:
-dot -Tpng generated/call_graph.dot -o generated/call_graph.png
+После запуска компилятора автоматически создаются
+-- `*.ast.json`
+-- `*.ast.dot`
+-- `*.ast.png`, если установлен graphviz dot
 
 
-
-Порядок такой:
-    -- исходный текст
-    -- парсер строит AST
-    -- из AST строится CFG
-    -- из CFG генерируется линейный код
-    -- потом собирается program.asm
+Дополнительно создаются
+-- `*.linear_code.txt`
+-- `program.asm`
+-- `call_graph.dot`
+-- `sourceName.functionName.dot`
 
 
-Вывод в консоль результатов:
+Порядок такой
+-- исходный текст
+-- парсер строит AST
+-- из AST строится CFG
+-- из CFG генерируется линейный код
+-- потом собирается `program.asm`
+
+
+Куда смотреть результат
 ls -la generated/test_basic
 cat generated/test_basic/program.asm
 cat generated/test_basic/main.linear_code.txt
 cat generated/test_basic/call_graph.dot
+
+
+Если нужно проверить калькулятор отдельно
+make run-calc
+make vm-run
+
+
+Если нужно собрать png для графа вызовов вручную
+dot -Tpng generated/test_interface/call_graph.dot -o generated/test_interface/call_graph.png
+
+--------------------------  Общий блок сборки и тестирования --------------------------
+make rebuild
+make run-input
+make run-calc
+make test
+make test-nested
+make test-method
+make test-interface
+make tests
+make vm-run
+
+
+
+
+
+Справка по 5 работе
+в 5 лабораторной добавлены пользовательские типы, наследование, методы, вложенные типы, интерфейсы и переопределение методов

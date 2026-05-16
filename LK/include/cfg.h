@@ -37,6 +37,7 @@ struct CFG {
 };
 
 typedef struct UserTypeField UserTypeField;
+typedef struct TypeNameNode TypeNameNode;
 struct UserTypeField {
     char* name;
     char* type_name;
@@ -46,12 +47,20 @@ struct UserTypeField {
     UserTypeField* next;
 };
 
+struct TypeNameNode {
+    char* name;
+    TypeNameNode* next;
+};
+
 typedef struct UserTypeMethod UserTypeMethod;
 struct UserTypeMethod {
     char* name;
     char* full_name;
+    char* signature_key;
     char* return_type;
+    char* owner_type_name;
     Node* ast_node;
+    int is_abstract;
     int line_number;
     UserTypeMethod* next;
 };
@@ -59,10 +68,13 @@ struct UserTypeMethod {
 typedef struct UserType UserType;
 struct UserType {
     char* name;
+    char* source_file;
     char* base_type_name;
+    TypeNameNode* interfaces;
     UserTypeField* fields;
     UserTypeMethod* methods;
     int size_bytes;
+    int is_interface;
     int resolved;
     int resolving;
     int line_number;

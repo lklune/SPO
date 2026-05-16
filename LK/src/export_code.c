@@ -533,11 +533,23 @@ void exportProgramAsm(AnalysisResult* result,
     if (result && result->types) {
         UserType* type_info = result->types->types;
         while (type_info) {
+            TypeNameNode* interface_name = type_info->interfaces;
             UserTypeField* field = type_info->fields;
             /* кратко печатаю типы и поля */
-            fprintf(f, "; .type %s", type_info->name ? type_info->name : "?");
+            fprintf(f, "; .%s %s",
+                type_info->is_interface ? "interface" : "type",
+                type_info->name ? type_info->name : "?");
             if (type_info->base_type_name && *type_info->base_type_name) {
                 fprintf(f, " of %s", type_info->base_type_name);
+            }
+            if (interface_name) {
+                fprintf(f, " implements ");
+                while (interface_name) {
+                    fprintf(f, "%s%s",
+                        interface_name != type_info->interfaces ? "," : "",
+                        interface_name->name ? interface_name->name : "?");
+                    interface_name = interface_name->next;
+                }
             }
             fprintf(f, " size=%d\n", type_info->size_bytes);
             while (field) {
@@ -549,6 +561,7 @@ void exportProgramAsm(AnalysisResult* result,
                     field->owner_type_name ? field->owner_type_name : "?");
                 field = field->next;
             }
+
             type_info = type_info->next;
         }
     }

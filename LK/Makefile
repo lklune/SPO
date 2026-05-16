@@ -1,4 +1,3 @@
-# Makefile for lab 3
 CC = gcc
 CFLAGS = -Wall -Wextra -g -Iinclude -Iparser
 LDFLAGS = -lm
@@ -33,6 +32,7 @@ TARGETS = $(BIN_DIR)/run_compiler
 TEST_BASIC = test_input/types_basic.src
 TEST_NESTED = test_input/types_nested.src
 TEST_METHOD = test_input/types_method.src
+TEST_INTERFACE = test_input/types_interface.src
 
 all: $(TARGETS)
 
@@ -108,12 +108,18 @@ test-method:
 	mkdir -p $(GEN_DIR)/test_method
 	./$(BIN_DIR)/run_compiler -o $(GEN_DIR)/test_method $(TEST_METHOD)
 
+test-interface:
+	rm -rf $(GEN_DIR)/test_interface
+	mkdir -p $(GEN_DIR)/test_interface
+	./$(BIN_DIR)/run_compiler -o $(GEN_DIR)/test_interface $(TEST_INTERFACE)
+
 tests:
 	$(MAKE) run-input
 	$(MAKE) run-calc
 	$(MAKE) test
 	$(MAKE) test-nested
 	$(MAKE) test-method
+	$(MAKE) test-interface
 
 vm-run: $(BIN_DIR)/run_compiler | $(GEN_DIR)
 	./$(BIN_DIR)/run_compiler -o $(GEN_DIR) calc.src
@@ -122,4 +128,4 @@ vm-run: $(BIN_DIR)/run_compiler | $(GEN_DIR)
 	$(TT) -ws -g "$$id" -r out.ptptb -o out.ptptb; \
 	$(TT) -ws -il -s ExecuteBinaryWithInteractiveInput definitionFile vm.target.pdsl stdinRegStName sin stdoutRegStName sout archName vm binaryFileToRun out.ptptb ipRegStorageName ipst finishMnemonicName END codeRamBankName code_ram
 
-.PHONY: all clean rebuild run-input run-calc test test-nested test-method tests vm-run
+.PHONY: all clean rebuild run-input run-calc test test-nested test-method test-interface tests vm-run

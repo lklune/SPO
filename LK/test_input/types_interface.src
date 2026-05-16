@@ -1,0 +1,19 @@
+interface ICounter begin
+    def ping() of int;
+end
+
+type Base begin
+    def ping() of int
+        return 1;
+    end
+end
+
+type Child of Base implements ICounter begin
+end
+
+def main()
+    Child c;
+    int x;
+
+    x = c.ping();
+end

@@ -20,6 +20,7 @@ void yyerror(const char *s);  // �������� ������� 
 %token <node> LESSTHAN GREATERTHAN LESSTHANEQ GREATERTHANEQ
 %token <node> AND OR NOT
 %token <node> OF
+%token <node> IMPLEMENTS
 %token <node> ARRAY
 %token <node> DEF END BEGIN_BLOCK
 %token <node> IDENTIFIER
@@ -34,7 +35,7 @@ void yyerror(const char *s);  // �������� ������� 
 %token <node> LPAREN RPAREN LBRACE RBRACE LBRACKET RBRACKET
 %token <node> TYPEDEF
 %token <node> ARRAY_COMMAS
-%token <node> TYPE DOT
+%token <node> TYPE INTERFACE DOT
 
 %right ASSIGN
 %left OR
@@ -56,10 +57,14 @@ void yyerror(const char *s);  // �������� ������� 
 %type <node> sourceItem
 %type <node> typeDecl
 %type <node> optionalBaseType
+%type <node> optionalImplementsList
+%type <node> listInterfaceName
 %type <node> typeMember
 %type <node> listTypeMember
 %type <node> fieldDecl
 %type <node> methodDecl
+%type <node> interfaceMethodDecl
+%type <node> listInterfaceMember
 %type <node> listSourceItem
 %type <node> statement
 %type <node> var
@@ -122,16 +127,30 @@ listSourceItem:
 
 typeDecl:
       /* type ... begin ... end */
-      TYPE IDENTIFIER optionalBaseType BEGIN_BLOCK listTypeMember END {
-          $$ = createNode("typeDecl", createNode("typeHeader", $3, NULL, $2 ? $2->value : NULL), $5, NULL);
+      TYPE IDENTIFIER optionalBaseType optionalImplementsList BEGIN_BLOCK listTypeMember END {
+          $$ = createNode("typeDecl", createNode("typeHeader", $3, $4, $2 ? $2->value : NULL), $6, "type");
           if ($$ && $$->left) {
               setNodeLine($$->left, $1 ? $1->line_number : 0);
           }
           setNodeLine($$, $1 ? $1->line_number : 0);
       }
     /* И на всякий случай оставляю такой же вариант через фигурные скобки. */
-    | TYPE IDENTIFIER optionalBaseType LBRACE listTypeMember RBRACE {
-          $$ = createNode("typeDecl", createNode("typeHeader", $3, NULL, $2 ? $2->value : NULL), $5, NULL);
+    | TYPE IDENTIFIER optionalBaseType optionalImplementsList LBRACE listTypeMember RBRACE {
+          $$ = createNode("typeDecl", createNode("typeHeader", $3, $4, $2 ? $2->value : NULL), $6, "type");
+          if ($$ && $$->left) {
+              setNodeLine($$->left, $1 ? $1->line_number : 0);
+          }
+          setNodeLine($$, $1 ? $1->line_number : 0);
+      }
+    | INTERFACE IDENTIFIER BEGIN_BLOCK listInterfaceMember END {
+          $$ = createNode("typeDecl", createNode("typeHeader", NULL, NULL, $2 ? $2->value : NULL), $4, "interface");
+          if ($$ && $$->left) {
+              setNodeLine($$->left, $1 ? $1->line_number : 0);
+          }
+          setNodeLine($$, $1 ? $1->line_number : 0);
+      }
+    | INTERFACE IDENTIFIER LBRACE listInterfaceMember RBRACE {
+          $$ = createNode("typeDecl", createNode("typeHeader", NULL, NULL, $2 ? $2->value : NULL), $4, "interface");
           if ($$ && $$->left) {
               setNodeLine($$->left, $1 ? $1->line_number : 0);
           }
@@ -143,6 +162,16 @@ optionalBaseType:
       { $$ = NULL; }
     /* of Base */
     | OF IDENTIFIER { $$ = $2; }
+    ;
+
+optionalImplementsList:
+      { $$ = NULL; }
+    | IMPLEMENTS listInterfaceName { $$ = $2; }
+    ;
+
+listInterfaceName:
+      IDENTIFIER { $$ = createNode("listInterfaceName", $1, NULL, NULL); setNodeLine($$, $1 ? $1->line_number : 0); }
+    | IDENTIFIER COMMA listInterfaceName { $$ = createNode("listInterfaceName", $1, $3, NULL); setNodeLine($$, $1 ? $1->line_number : 0); }
     ;
 
 listTypeMember:
@@ -168,6 +197,18 @@ methodDecl:
       /* метод внутри type */
       DEF funcSignature listStatement END {
           $$ = createNode("methodDecl", $2, $3, NULL);
+          setNodeLine($$, $1 ? $1->line_number : 0);
+      }
+    ;
+
+listInterfaceMember:
+      interfaceMethodDecl listInterfaceMember { $$ = createNode("listTypeMember", $1, $2, NULL); setNodeLine($$, $1 ? $1->line_number : 0); }
+    | { $$ = NULL; }
+    ;
+
+interfaceMethodDecl:
+      DEF funcSignature SEMICOLON {
+          $$ = createNode("interfaceMethodDecl", $2, NULL, NULL);
           setNodeLine($$, $1 ? $1->line_number : 0);
       }
     ;

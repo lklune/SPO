@@ -90,6 +90,14 @@
  yylval.node = createNode("OF", NULL, NULL, "");
  return OF;
  }
+"implements"                        {
+ yylval.node = createNode("IMPLEMENTS", NULL, NULL, "");
+ return IMPLEMENTS;
+ }
+"interface"                         {
+ yylval.node = createNode("INTERFACE", NULL, NULL, "");
+ return INTERFACE;
+ }
 "array"                                {
  yylval.node = createNode("ARRAY", NULL, NULL, "");
  return ARRAY;

@@ -662,7 +662,13 @@ static void emit_method_call(LinearCode* code, RegisterAllocator* alloc, Operati
         emit_expression(code, alloc, op->right->left->left, 0);
     }
 
-    if (method && method->full_name) {
+    if (method && method->is_abstract) {
+        fprintf(stderr, "Cannot call interface method without concrete implementation: %s.%s\n",
+            object_type ? object_type : "?",
+            op->value ? op->value : "?");
+        addInstruction(code, INSTR_LOAD_CONST, createRegisterOperand(0), createConstantOperand(0));
+    }
+    else if (method && method->full_name) {
         /* если тип найден, беру полное имя */
         addInstruction(code, INSTR_CALL, createLabelOperand(method->full_name), createConstantOperand(0));
     }

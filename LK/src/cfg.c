@@ -120,6 +120,47 @@ void addTypeToCollection(TypeCollection* collection, UserType* type_info) {
     collection->type_count++;
 }
 
+static TypeNameNode* createTypeNameNode(const char* name) {
+    TypeNameNode* node;
+
+    if (!name) return NULL;
+
+    node = (TypeNameNode*)malloc(sizeof(TypeNameNode));
+    if (!node) return NULL;
+
+    node->name = strdup(name);
+    node->next = NULL;
+    return node;
+}
+
+static void appendTypeNameNode(TypeNameNode** list, const char* name) {
+    TypeNameNode* node;
+
+    if (!list || !name) return;
+
+    node = createTypeNameNode(name);
+    if (!node) return;
+
+    if (!*list) {
+        *list = node;
+    }
+    else {
+        TypeNameNode* tail = *list;
+        while (tail->next) tail = tail->next;
+        tail->next = node;
+    }
+}
+
+static int typeNameListContains(TypeNameNode* list, const char* name) {
+    while (list) {
+        if (list->name && name && strcmp(list->name, name) == 0) {
+            return 1;
+        }
+        list = list->next;
+    }
+    return 0;
+}
+
 /* Поиск типа по имени */
 UserType* findUserType(TypeCollection* collection, const char* type_name) {
     UserType* current;
@@ -189,6 +230,15 @@ UserTypeMethod* findUserTypeMethod(TypeCollection* collection, const char* type_
     return NULL;
 }
 
+static UserTypeMethod* findInheritedUserTypeMethod(TypeCollection* collection,
+    UserType* type_info, const char* method_name) {
+    if (!collection || !type_info || !type_info->base_type_name) {
+        return NULL;
+    }
+
+    return findUserTypeMethod(collection, type_info->base_type_name, method_name);
+}
+
 /* Проверка на встроенный тип */
 int isBuiltinTypeName(const char* type_name) {
     if (!type_name) return 0;
@@ -244,8 +294,16 @@ void freeTypeCollection(TypeCollection* collection) {
     current = collection->types;
     while (current) {
         UserType* next_type = current->next;
+        TypeNameNode* interface_name = current->interfaces;
         UserTypeField* field = current->fields;
         UserTypeMethod* method = current->methods;
+
+        while (interface_name) {
+            TypeNameNode* next_name = interface_name->next;
+            free(interface_name->name);
+            free(interface_name);
+            interface_name = next_name;
+        }
 
         while (field) {
             UserTypeField* next_field = field->next;
@@ -260,12 +318,15 @@ void freeTypeCollection(TypeCollection* collection) {
             UserTypeMethod* next_method = method->next;
             free(method->name);
             free(method->full_name);
+            free(method->signature_key);
             free(method->return_type);
+            free(method->owner_type_name);
             free(method);
             method = next_method;
         }
 
         free(current->name);
+        free(current->source_file);
         free(current->base_type_name);
         free(current);
         current = next_type;
@@ -467,6 +528,50 @@ static char* buildTypeNameFromNode(Node* node) {
     }
 
     return strdup("?");
+}
+
+static char* buildMethodSignatureKeyFromSignatureNode(Node* sig_node) {
+    char buffer[1024];
+    size_t used = 0;
+    Node* arg_list;
+    int first = 1;
+    char* return_type_name;
+
+    if (!sig_node) return strdup("?");
+
+    used += (size_t)snprintf(buffer + used, sizeof(buffer) - used, "%s(",
+        sig_node->value ? sig_node->value : "?");
+
+    arg_list = sig_node->left;
+    while (arg_list) {
+        Node* arg_node = NULL;
+        char* arg_type_name;
+
+        if (arg_list->type && strcmp(arg_list->type, "listArgDef") == 0) {
+            arg_node = arg_list->left;
+            arg_list = arg_list->right;
+        }
+        else if (arg_list->type && strcmp(arg_list->type, "argDef") == 0) {
+            arg_node = arg_list;
+            arg_list = NULL;
+        }
+        else {
+            break;
+        }
+
+        arg_type_name = buildTypeNameFromNode(arg_node ? arg_node->right : NULL);
+        used += (size_t)snprintf(buffer + used, sizeof(buffer) - used, "%s%s",
+            first ? "" : ",", arg_type_name ? arg_type_name : "?");
+        first = 0;
+        free(arg_type_name);
+    }
+
+    return_type_name = buildTypeNameFromNode(sig_node->right);
+    snprintf(buffer + used, sizeof(buffer) - used, ")->%s",
+        return_type_name ? return_type_name : "?");
+    free(return_type_name);
+
+    return strdup(buffer);
 }
 
 /* Преобразование AST-выражения в дерево операций для CFG
@@ -761,7 +866,8 @@ static void addTypeField(UserType* type_info, const char* field_name,
  * Сохраняется полное имя для asm и AST узел для будущей сборки CFG
  */
 static void addTypeMethod(UserType* type_info, const char* method_name,
-    const char* full_name, const char* return_type, Node* ast_node, int line_number) {
+    const char* full_name, const char* signature_key, const char* return_type,
+    Node* ast_node, int is_abstract, int line_number) {
     UserTypeMethod* method;
 
     if (!type_info || !method_name || !full_name) return;
@@ -772,8 +878,11 @@ static void addTypeMethod(UserType* type_info, const char* method_name,
 
     method->name = strdup(method_name);
     method->full_name = strdup(full_name);
+    method->signature_key = signature_key ? strdup(signature_key) : strdup("?");
     method->return_type = return_type ? strdup(return_type) : strdup("?");
+    method->owner_type_name = type_info->name ? strdup(type_info->name) : NULL;
     method->ast_node = ast_node;
+    method->is_abstract = is_abstract;
     method->line_number = line_number;
     method->next = NULL;
 
@@ -784,6 +893,22 @@ static void addTypeMethod(UserType* type_info, const char* method_name,
         UserTypeMethod* tail = type_info->methods;
         while (tail->next) tail = tail->next;
         tail->next = method;
+    }
+}
+
+static void collectImplementedInterfaces(UserType* type_info, Node* node) {
+    if (!type_info || !node) return;
+
+    if (node->type && strcmp(node->type, "listInterfaceName") == 0) {
+        if (node->left && node->left->value) {
+            appendTypeNameNode(&type_info->interfaces, node->left->value);
+        }
+        collectImplementedInterfaces(type_info, node->right);
+        return;
+    }
+
+    if (node->value) {
+        appendTypeNameNode(&type_info->interfaces, node->value);
     }
 }
 
@@ -833,13 +958,30 @@ static void collectTypeMembers(UserType* type_info, Node* node) {
     if (node->type && strcmp(node->type, "methodDecl") == 0 && node->left) {
         char full_name[256];
         char* return_type_name = buildTypeNameFromNode(node->left->right);
+        char* signature_key = buildMethodSignatureKeyFromSignatureNode(node->left);
         /* такое имя потом удобнее в asm */
         snprintf(full_name, sizeof(full_name), "%s__%s",
             type_info->name ? type_info->name : "type",
             node->left->value ? node->left->value : "method");
         addTypeMethod(type_info,
             node->left->value ? node->left->value : "method",
-            full_name, return_type_name, node, node->line_number);
+            full_name, signature_key, return_type_name, node, 0, node->line_number);
+        free(signature_key);
+        free(return_type_name);
+        return;
+    }
+
+    if (node->type && strcmp(node->type, "interfaceMethodDecl") == 0 && node->left) {
+        char full_name[256];
+        char* return_type_name = buildTypeNameFromNode(node->left->right);
+        char* signature_key = buildMethodSignatureKeyFromSignatureNode(node->left);
+        snprintf(full_name, sizeof(full_name), "%s__%s",
+            type_info->name ? type_info->name : "interface",
+            node->left->value ? node->left->value : "method");
+        addTypeMethod(type_info,
+            node->left->value ? node->left->value : "method",
+            full_name, signature_key, return_type_name, NULL, 1, node->line_number);
+        free(signature_key);
         free(return_type_name);
     }
 }
@@ -858,11 +1000,14 @@ static UserType* buildTypeFromDecl(Node* type_decl, ErrorCollection* errors,
     if (!type_info) return NULL;
 
     type_info->name = header->value ? strdup(header->value) : strdup("?");
+    type_info->source_file = filename ? strdup(filename) : NULL;
     type_info->base_type_name = (header->left && header->left->value)
         ? strdup(header->left->value) : NULL;
+    type_info->interfaces = NULL;
     type_info->fields = NULL;
     type_info->methods = NULL;
     type_info->size_bytes = 0;
+    type_info->is_interface = (type_decl->value && strcmp(type_decl->value, "interface") == 0);
     type_info->resolved = 0;
     type_info->resolving = 0;
     type_info->line_number = type_decl->line_number;
@@ -874,6 +1019,7 @@ static UserType* buildTypeFromDecl(Node* type_decl, ErrorCollection* errors,
             filename, type_decl->line_number);
     }
 
+    collectImplementedInterfaces(type_info, header->right);
     collectTypeMembers(type_info, type_decl->right);
     return type_info;
 }
@@ -884,7 +1030,7 @@ static UserType* buildTypeFromDecl(Node* type_decl, ErrorCollection* errors,
  * Для поля user type сначала считается размер вложенного типа
  */
 static int resolveUserTypeLayout(TypeCollection* types, UserType* type_info,
-    ErrorCollection* errors, const char* filename) {
+    ErrorCollection* errors) {
     int offset = 0;
     UserTypeField* field;
 
@@ -894,21 +1040,32 @@ static int resolveUserTypeLayout(TypeCollection* types, UserType* type_info,
 
     if (type_info->resolving) {
         addErrorToCollection(errors, "Cyclic type inheritance detected",
-            filename, type_info->line_number);
+            type_info->source_file, type_info->line_number);
         return 0;
     }
 
     type_info->resolving = 1;
 
+    if (type_info->is_interface) {
+        type_info->size_bytes = 0;
+        type_info->resolved = 1;
+        type_info->resolving = 0;
+        return 1;
+    }
+
     if (type_info->base_type_name) {
         UserType* base_type = findUserType(types, type_info->base_type_name);
         if (!base_type) {
             addErrorToCollection(errors, "Unknown base type",
-                filename, type_info->line_number);
+                type_info->source_file, type_info->line_number);
+        }
+        else if (base_type->is_interface) {
+            addErrorToCollection(errors, "Type cannot inherit from interface",
+                type_info->source_file, type_info->line_number);
         }
         else {
             /* сначала база */
-            resolveUserTypeLayout(types, base_type, errors, filename);
+            resolveUserTypeLayout(types, base_type, errors);
             offset = base_type->size_bytes;
         }
     }
@@ -920,7 +1077,7 @@ static int resolveUserTypeLayout(TypeCollection* types, UserType* type_info,
         if (type_info->base_type_name &&
             findUserTypeField(types, type_info->base_type_name, field->name)) {
             addErrorToCollection(errors, "Field hides inherited field",
-                filename, field->line_number);
+                type_info->source_file, field->line_number);
         }
 
         /* если поле тоже user type, сначала считаю его */
@@ -930,10 +1087,14 @@ static int resolveUserTypeLayout(TypeCollection* types, UserType* type_info,
             UserType* field_type = findUserType(types, field->type_name);
             if (!field_type) {
                 addErrorToCollection(errors, "Unknown field type",
-                    filename, field->line_number);
+                    type_info->source_file, field->line_number);
+            }
+            else if (field_type->is_interface) {
+                addErrorToCollection(errors, "Field cannot have interface type",
+                    type_info->source_file, field->line_number);
             }
             else {
-                resolveUserTypeLayout(types, field_type, errors, filename);
+                resolveUserTypeLayout(types, field_type, errors);
             }
         }
 
@@ -956,10 +1117,107 @@ static void resolveAllUserTypes(TypeCollection* types, ErrorCollection* errors,
     UserType* current;
 
     if (!types) return;
+    (void)filename;
 
     current = types->types;
     while (current) {
-        resolveUserTypeLayout(types, current, errors, filename);
+        resolveUserTypeLayout(types, current, errors);
+        current = current->next;
+    }
+}
+
+static void validateMethodRules(TypeCollection* types, UserType* type_info,
+    ErrorCollection* errors) {
+    UserTypeMethod* method;
+
+    if (!type_info) return;
+
+    method = type_info->methods;
+    while (method) {
+        UserTypeMethod* other = method->next;
+        while (other) {
+            if (method->name && other->name &&
+                strcmp(method->name, other->name) == 0) {
+                addErrorToCollection(errors,
+                    (method->signature_key && other->signature_key &&
+                        strcmp(method->signature_key, other->signature_key) == 0)
+                    ? "Duplicate method declaration"
+                    : "Method overloading is not supported",
+                    type_info->source_file, other->line_number);
+            }
+            other = other->next;
+        }
+
+        if (!type_info->is_interface) {
+            UserTypeMethod* base_method =
+                findInheritedUserTypeMethod(types, type_info, method->name);
+            if (base_method &&
+                (!method->signature_key || !base_method->signature_key ||
+                    strcmp(method->signature_key, base_method->signature_key) != 0)) {
+                addErrorToCollection(errors,
+                    "Override signature mismatch",
+                    type_info->source_file, method->line_number);
+            }
+        }
+
+        method = method->next;
+    }
+}
+
+static void validateInterfaceImplementation(TypeCollection* types, UserType* type_info,
+    ErrorCollection* errors) {
+    TypeNameNode* interface_name;
+
+    if (!type_info || type_info->is_interface) return;
+
+    interface_name = type_info->interfaces;
+    while (interface_name) {
+        UserType* interface_type = findUserType(types, interface_name->name);
+        if (!interface_type) {
+            addErrorToCollection(errors, "Unknown interface",
+                type_info->source_file, type_info->line_number);
+        }
+        else if (!interface_type->is_interface) {
+            addErrorToCollection(errors, "Implemented type is not an interface",
+                type_info->source_file, type_info->line_number);
+        }
+        else {
+            UserTypeMethod* interface_method = interface_type->methods;
+            while (interface_method) {
+                UserTypeMethod* impl_method =
+                    findUserTypeMethod(types, type_info->name, interface_method->name);
+                if (!impl_method) {
+                    addErrorToCollection(errors, "Type does not implement interface method",
+                        type_info->source_file, type_info->line_number);
+                }
+                else if (!impl_method->signature_key || !interface_method->signature_key ||
+                    strcmp(impl_method->signature_key, interface_method->signature_key) != 0) {
+                    addErrorToCollection(errors, "Interface method signature mismatch",
+                        type_info->source_file, impl_method->line_number);
+                }
+                interface_method = interface_method->next;
+            }
+        }
+
+        if (interface_name->next &&
+            typeNameListContains(interface_name->next, interface_name->name)) {
+            addErrorToCollection(errors, "Duplicate interface in implements list",
+                type_info->source_file, type_info->line_number);
+        }
+
+        interface_name = interface_name->next;
+    }
+}
+
+static void validateAllUserTypes(TypeCollection* types, ErrorCollection* errors) {
+    UserType* current;
+
+    if (!types) return;
+
+    current = types->types;
+    while (current) {
+        validateMethodRules(types, current, errors);
+        validateInterfaceImplementation(types, current, errors);
         current = current->next;
     }
 }
@@ -1114,6 +1372,7 @@ AnalysisResult* buildCFGFromAST(FileCollection* file_collection) {
 
     resolveAllUserTypes(types, errors,
         file_collection->files ? file_collection->files->filename : NULL);
+    validateAllUserTypes(types, errors);
 
     {
         FileInfo* fi = file_collection->files;
