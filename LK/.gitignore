@@ -15,3 +15,4 @@ parser/parser.tab.c
 parser/parser.tab.h
 parser/parser.output
 parser/lex.yy.c
+../RemoteTasks/ 

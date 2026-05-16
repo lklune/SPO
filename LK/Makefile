@@ -4,7 +4,7 @@ CFLAGS = -Wall -Wextra -g -Iinclude -Iparser
 LDFLAGS = -lm
 BISON = bison
 FLEX = flex
-TT = /mnt/c/Users/december/Desktop/SPO/260321/SPO/LK/RemoteTasks/Portable.RemoteTasks.Manager.exe -ul 472626 -up a72ac3ca-c226-422f-bcbe-a2b70133fd16
+TT = /mnt/c/Users/december/Documents/RemoteTasks/Portable.RemoteTasks.Manager.exe -ul 472626 -up a72ac3ca-c226-422f-bcbe-a2b70133fd16
 
 BIN_DIR = bin
 OBJ_DIR = obj
@@ -30,7 +30,9 @@ COMPILER_OBJS = \
 	$(OBJ_DIR)/parser.tab.o
 
 TARGETS = $(BIN_DIR)/run_compiler
-INPUT ?= input.txt
+TEST_BASIC = test_input/types_basic.src
+TEST_NESTED = test_input/types_nested.src
+TEST_METHOD = test_input/types_method.src
 
 all: $(TARGETS)
 
@@ -79,12 +81,42 @@ clean:
 	rm -rf $(GEN_DIR)
 	rm -f $(PARSER_GEN_C) $(PARSER_GEN_H) $(LEXER_GEN_C)
 
-run: $(BIN_DIR)/run_compiler | $(GEN_DIR)
-	./$(BIN_DIR)/run_compiler -o $(GEN_DIR) $(INPUT)
+rebuild: clean all
 
-run-all: $(BIN_DIR)/run_compiler | $(GEN_DIR)
-	./$(BIN_DIR)/run_compiler -o $(GEN_DIR) input.txt
-	./$(BIN_DIR)/run_compiler -o $(GEN_DIR) calc.src
+clean-generated:
+	rm -rf $(GEN_DIR)
+
+run-input:
+	rm -rf $(GEN_DIR)/input
+	mkdir -p $(GEN_DIR)/input
+	./$(BIN_DIR)/run_compiler -o $(GEN_DIR)/input input.txt
+
+run-calc:
+	rm -rf $(GEN_DIR)/calc
+	mkdir -p $(GEN_DIR)/calc
+	./$(BIN_DIR)/run_compiler -o $(GEN_DIR)/calc calc.src
+
+test:
+	rm -rf $(GEN_DIR)/test_basic
+	mkdir -p $(GEN_DIR)/test_basic
+	./$(BIN_DIR)/run_compiler -o $(GEN_DIR)/test_basic $(TEST_BASIC)
+
+test-nested:
+	rm -rf $(GEN_DIR)/test_nested
+	mkdir -p $(GEN_DIR)/test_nested
+	./$(BIN_DIR)/run_compiler -o $(GEN_DIR)/test_nested $(TEST_NESTED)
+
+test-method:
+	rm -rf $(GEN_DIR)/test_method
+	mkdir -p $(GEN_DIR)/test_method
+	./$(BIN_DIR)/run_compiler -o $(GEN_DIR)/test_method $(TEST_METHOD)
+
+tests:
+	$(MAKE) run-input
+	$(MAKE) run-calc
+	$(MAKE) test
+	$(MAKE) test-nested
+	$(MAKE) test-method
 
 vm-run: $(BIN_DIR)/run_compiler | $(GEN_DIR)
 	./$(BIN_DIR)/run_compiler -o $(GEN_DIR) calc.src
@@ -93,4 +125,4 @@ vm-run: $(BIN_DIR)/run_compiler | $(GEN_DIR)
 	$(TT) -ws -g "$$id" -r out.ptptb -o out.ptptb; \
 	$(TT) -ws -il -s ExecuteBinaryWithInteractiveInput definitionFile vm.target.pdsl stdinRegStName sin stdoutRegStName sout archName vm binaryFileToRun out.ptptb ipRegStorageName ipst finishMnemonicName END codeRamBankName code_ram
 
-.PHONY: all clean run run-all vm-run
+.PHONY: all clean rebuild clean-generated run-input run-calc test test-nested test-method tests vm-run
