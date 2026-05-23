@@ -102,6 +102,7 @@ typedef struct {
 
 typedef struct {
     FunctionSignature* signature;
+    char* generated_name;
     LinearCode* code;
     RegisterAllocator* alloc;
 } CompiledFunction;

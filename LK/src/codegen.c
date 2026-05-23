@@ -6,10 +6,51 @@
 
 static int g_label_counter = 0;
 static Function* g_current_function = NULL;
+static FunctionCollection* g_all_functions = NULL;
+static const char* g_current_first_arg_override = NULL;
+
+typedef struct {
+    Function* function;
+    char* first_arg_override;
+} CompileRequest;
+
+typedef struct {
+    CompileRequest* items;
+    int count;
+    int capacity;
+    int next_index;
+} CompileRequestQueue;
+
+static CompileRequestQueue g_compile_queue = { 0 };
 
 /* Создание уникальной метки для внутренних переходов */
 static void make_auto_label(char* buf, size_t size, const char* prefix) {
     snprintf(buf, size, "%s_%d", prefix, g_label_counter++);
+}
+
+static int is_builtin_print_name(const char* name) {
+    if (!name) {
+        return 0;
+    }
+
+    return strcmp(name, "print") == 0 ||
+        strcmp(name, "printf") == 0 ||
+        strcmp(name, "println") == 0;
+}
+
+static int is_newline_print_name(const char* name) {
+    return name && strcmp(name, "println") == 0;
+}
+
+static Operation* get_first_call_argument(Operation* op) {
+    if (!op || !op->right ||
+        strcmp(op->right->op_type ? op->right->op_type : "", "optionalListExpr") != 0 ||
+        !op->right->left ||
+        strcmp(op->right->left->op_type ? op->right->left->op_type : "", "listExpr") != 0) {
+        return NULL;
+    }
+
+    return op->right->left->left;
 }
 
 /* Набор helper-функций для создания операндов
@@ -302,6 +343,7 @@ static long parse_literal_value(const Operation* op) {
 /* Получение типа аргумента из сигнатуры функции */
 static const char* current_type_name_for_variable(const char* name) {
     FunctionArg* arg;
+    int is_first_arg = 1;
 
     if (!g_current_function || !g_current_function->signature || !name) {
         return NULL;
@@ -310,8 +352,12 @@ static const char* current_type_name_for_variable(const char* name) {
     arg = g_current_function->signature->args;
     while (arg) {
         if (arg->name && strcmp(arg->name, name) == 0) {
+            if (is_first_arg && g_current_first_arg_override) {
+                return g_current_first_arg_override;
+            }
             return arg->type;
         }
+        is_first_arg = 0;
         arg = arg->next;
     }
 
@@ -322,6 +368,143 @@ static const char* current_type_name_for_variable(const char* name) {
 static int is_user_type_name(const char* type_name) {
     return type_name && !isBuiltinTypeName(type_name) &&
         strncmp(type_name, "array(", 6) != 0;
+}
+
+static Function* find_function_by_name(const char* function_name) {
+    Function* current = g_all_functions ? g_all_functions->functions : NULL;
+
+    while (current) {
+        if (current->signature && current->signature->name &&
+            function_name && strcmp(current->signature->name, function_name) == 0) {
+            return current;
+        }
+        current = current->next;
+    }
+
+    return NULL;
+}
+
+static int type_extends_or_equals(TypeCollection* types,
+    const char* actual_type_name,
+    const char* expected_type_name) {
+    UserType* current;
+
+    if (!types || !actual_type_name || !expected_type_name) {
+        return 0;
+    }
+
+    current = findUserType(types, actual_type_name);
+    while (current) {
+        if (current->name && strcmp(current->name, expected_type_name) == 0) {
+            return 1;
+        }
+
+        if (!current->base_type_name) {
+            break;
+        }
+        current = findUserType(types, current->base_type_name);
+    }
+
+    return 0;
+}
+
+static int type_implements_interface(TypeCollection* types,
+    const char* actual_type_name,
+    const char* interface_type_name) {
+    UserType* current;
+
+    if (!types || !actual_type_name || !interface_type_name) {
+        return 0;
+    }
+
+    current = findUserType(types, actual_type_name);
+    while (current) {
+        TypeNameNode* implemented = current->interfaces;
+        while (implemented) {
+            if (implemented->name &&
+                type_extends_or_equals(types, implemented->name, interface_type_name)) {
+                return 1;
+            }
+            implemented = implemented->next;
+        }
+
+        if (!current->base_type_name) {
+            break;
+        }
+        current = findUserType(types, current->base_type_name);
+    }
+
+    return 0;
+}
+
+static int is_assignable_user_type(TypeCollection* types,
+    const char* actual_type_name,
+    const char* expected_type_name) {
+    UserType* expected_type;
+
+    if (!types || !actual_type_name || !expected_type_name) {
+        return 0;
+    }
+
+    expected_type = findUserType(types, expected_type_name);
+    if (!expected_type) {
+        return 0;
+    }
+
+    if (expected_type->is_interface) {
+        return type_implements_interface(types, actual_type_name, expected_type_name);
+    }
+
+    return type_extends_or_equals(types, actual_type_name, expected_type_name);
+}
+
+static void make_specialized_function_name(char* buffer, size_t size,
+    const char* function_name, const char* first_arg_type_name) {
+    if (!buffer || size == 0) {
+        return;
+    }
+
+    snprintf(buffer, size, "%s__spec__%s",
+        function_name ? function_name : "fn",
+        first_arg_type_name ? first_arg_type_name : "arg");
+}
+
+static int enqueue_compile_request(Function* function, const char* first_arg_override) {
+    int i;
+
+    if (!function) {
+        return 0;
+    }
+
+    for (i = 0; i < g_compile_queue.count; i++) {
+        const char* existing_override = g_compile_queue.items[i].first_arg_override;
+        if (g_compile_queue.items[i].function != function) {
+            continue;
+        }
+
+        if ((!existing_override && !first_arg_override) ||
+            (existing_override && first_arg_override &&
+                strcmp(existing_override, first_arg_override) == 0)) {
+            return 0;
+        }
+    }
+
+    if (g_compile_queue.count >= g_compile_queue.capacity) {
+        int new_capacity = g_compile_queue.capacity > 0 ? g_compile_queue.capacity * 2 : 32;
+        CompileRequest* resized = (CompileRequest*)realloc(g_compile_queue.items,
+            (size_t)new_capacity * sizeof(CompileRequest));
+        if (!resized) {
+            return 0;
+        }
+        g_compile_queue.items = resized;
+        g_compile_queue.capacity = new_capacity;
+    }
+
+    g_compile_queue.items[g_compile_queue.count].function = function;
+    g_compile_queue.items[g_compile_queue.count].first_arg_override =
+        first_arg_override ? strdup(first_arg_override) : NULL;
+    g_compile_queue.count++;
+    return 1;
 }
 
 /* Создание привязки переменной, если она встретилась в выражении
@@ -620,10 +803,97 @@ static void emit_compare_to_bool(LinearCode* code, const char* compare_op, int t
     addInstruction(code, INSTR_LABEL, createLabelOperand(end_lbl), createConstantOperand(0));
 }
 
+static void emit_builtin_print_call(LinearCode* code, RegisterAllocator* alloc,
+    Operation* op, int target_reg) {
+    Operation* arg;
+    const char* call_name;
+
+    if (!op || !op->left || !op->left->value) {
+        return;
+    }
+
+    call_name = op->left->value;
+    arg = get_first_call_argument(op);
+
+    if (arg) {
+        if (arg->op_type && strcmp(arg->op_type, "STR") == 0) {
+            addInstruction(code, INSTR_PRINT_STR,
+                createStringOperand(arg->value ? arg->value : ""),
+                createConstantOperand(0));
+        }
+        else {
+            emit_expression(code, alloc, arg, 0);
+            addInstruction(code, INSTR_CALL, createLabelOperand("writeInt"), createConstantOperand(0));
+        }
+    }
+
+    if (is_newline_print_name(call_name)) {
+        addInstruction(code, INSTR_LOAD_CONST, createRegisterOperand(0), createConstantOperand(10));
+        addInstruction(code, INSTR_CALL, createLabelOperand("writeByte"), createConstantOperand(0));
+    }
+
+    addInstruction(code, INSTR_LOAD_CONST, createRegisterOperand(target_reg), createConstantOperand(0));
+}
+
+static void resolve_function_call_target(RegisterAllocator* alloc,
+    Operation* op,
+    char* target_name,
+    size_t target_name_size) {
+    Function* callee;
+    FunctionArg* first_arg;
+    Operation* first_call_arg;
+    const char* actual_type_name;
+    const char* declared_type_name;
+    TypeCollection* types = g_current_function ? g_current_function->types : NULL;
+
+    if (!target_name || target_name_size == 0) {
+        return;
+    }
+
+    target_name[0] = '\0';
+    if (!op || !op->left || !op->left->value) {
+        return;
+    }
+
+    snprintf(target_name, target_name_size, "%s", op->left->value);
+
+    callee = find_function_by_name(op->left->value);
+    if (!callee || callee->is_method) {
+        return;
+    }
+
+    first_arg = (callee->signature) ? callee->signature->args : NULL;
+    first_call_arg = get_first_call_argument(op);
+    actual_type_name = resolve_expression_type(alloc, first_call_arg);
+    declared_type_name = first_arg ? first_arg->type : NULL;
+
+    if (first_arg &&
+        declared_type_name &&
+        actual_type_name &&
+        is_user_type_name(declared_type_name) &&
+        is_user_type_name(actual_type_name) &&
+        strcmp(declared_type_name, actual_type_name) != 0 &&
+        is_assignable_user_type(types, actual_type_name, declared_type_name)) {
+        make_specialized_function_name(target_name, target_name_size,
+            op->left->value, actual_type_name);
+        enqueue_compile_request(callee, actual_type_name);
+        return;
+    }
+
+    enqueue_compile_request(callee, NULL);
+}
+
 /* Генерация обычного CALL
  * Пока используется только первый аргумент
  */
 static void emit_call(LinearCode* code, RegisterAllocator* alloc, Operation* op, int target_reg) {
+    char call_target[256];
+
+    if (op && op->left && is_builtin_print_name(op->left->value)) {
+        emit_builtin_print_call(code, alloc, op, target_reg);
+        return;
+    }
+
     /* пока беру только первый аргумент */
     if (op && op->right && strcmp(op->right->op_type, "optionalListExpr") == 0 &&
         op->right->left && strcmp(op->right->left->op_type, "listExpr") == 0 &&
@@ -631,8 +901,9 @@ static void emit_call(LinearCode* code, RegisterAllocator* alloc, Operation* op,
         emit_expression(code, alloc, op->right->left->left, 0);
     }
 
-    if (op && op->left && op->left->value) {
-        addInstruction(code, INSTR_CALL, createLabelOperand(op->left->value), createConstantOperand(0));
+    resolve_function_call_target(alloc, op, call_target, sizeof(call_target));
+    if (call_target[0] != '\0') {
+        addInstruction(code, INSTR_CALL, createLabelOperand(call_target), createConstantOperand(0));
     }
 
     if (target_reg != 0) {
@@ -871,8 +1142,14 @@ static int is_internal_label_name(const char* name) {
 /* Добавление имени функции к внутренним меткам */
 static void namespace_internal_labels(CompiledFunction* compiled) {
     int i;
+    const char* function_name;
 
-    if (!compiled || !compiled->code || !compiled->signature || !compiled->signature->name) {
+    function_name = (compiled && compiled->generated_name && *compiled->generated_name)
+        ? compiled->generated_name
+        : ((compiled && compiled->signature && compiled->signature->name)
+            ? compiled->signature->name : NULL);
+
+    if (!compiled || !compiled->code || !function_name) {
         return;
     }
 
@@ -886,7 +1163,7 @@ static void namespace_internal_labels(CompiledFunction* compiled) {
             char* old_name = instr->operand1.value.name;
 
             snprintf(namespaced, sizeof(namespaced), "%s_%s",
-                compiled->signature->name,
+                function_name,
                 old_name);
 
             instr->operand1.value.name = strdup(namespaced);
@@ -995,11 +1272,14 @@ static void generate_block_recursive(BasicBlock* block,
 /* Генерация линейного кода для одной функции
  * Здесь создаётся свой allocator, ставится имя функции и обходится её CFG
  */
-CompiledFunction* generateCodeFromFunction(Function* cfg_func) {
+static CompiledFunction* generateCodeFromFunctionWithOverride(Function* cfg_func,
+    const char* first_arg_override) {
     CompiledFunction* compiled;
+    const char* previous_override;
     int max_id;
     int visited_size;
     unsigned char* visited;
+    char generated_name[256];
 
     /* новая функция - новый набор всего */
     if (!cfg_func || !cfg_func->cfg) {
@@ -1012,27 +1292,42 @@ CompiledFunction* generateCodeFromFunction(Function* cfg_func) {
     }
 
     compiled->signature = cfg_func->signature;
+    if (first_arg_override && cfg_func->signature && cfg_func->signature->name) {
+        make_specialized_function_name(generated_name, sizeof(generated_name),
+            cfg_func->signature->name, first_arg_override);
+    }
+    else {
+        snprintf(generated_name, sizeof(generated_name), "%s",
+            (cfg_func->signature && cfg_func->signature->name)
+            ? cfg_func->signature->name : "unknown");
+    }
+    compiled->generated_name = strdup(generated_name);
     compiled->code = createLinearCode();
     compiled->alloc = createRegisterAllocator(16, 1024);
 
-    if (!compiled->code || !compiled->alloc) {
+    if (!compiled->generated_name || !compiled->code || !compiled->alloc) {
+        if (compiled->generated_name) free(compiled->generated_name);
         if (compiled->code) freeLinearCode(compiled->code);
         if (compiled->alloc) freeRegisterAllocator(compiled->alloc);
         free(compiled);
         return NULL;
     }
 
+    previous_override = g_current_first_arg_override;
     g_current_function = cfg_func;
+    g_current_first_arg_override = first_arg_override;
 
-    if (cfg_func->signature && cfg_func->signature->name) {
-        addInstruction(compiled->code, INSTR_LABEL, createLabelOperand(cfg_func->signature->name), createConstantOperand(0));
+    if (compiled->generated_name) {
+        addInstruction(compiled->code, INSTR_LABEL,
+            createLabelOperand(compiled->generated_name), createConstantOperand(0));
     }
 
     if (cfg_func->signature && cfg_func->signature->args) {
         FunctionArg* arg = cfg_func->signature->args;
         if (arg && arg->name) {
             /* первый аргумент сразу сохраняю */
-            ensure_variable_binding_with_type(compiled->alloc, arg->name, arg->type, 1);
+            const char* effective_arg_type = first_arg_override ? first_arg_override : arg->type;
+            ensure_variable_binding_with_type(compiled->alloc, arg->name, effective_arg_type, 1);
             addInstruction(compiled->code, INSTR_MOV, createVariableOperand(arg->name), createRegisterOperand(0));
         }
     }
@@ -1045,10 +1340,12 @@ CompiledFunction* generateCodeFromFunction(Function* cfg_func) {
 
     visited = (unsigned char*)calloc((size_t)visited_size, sizeof(unsigned char));
     if (!visited) {
+        free(compiled->generated_name);
         freeLinearCode(compiled->code);
         freeRegisterAllocator(compiled->alloc);
         free(compiled);
         g_current_function = NULL;
+        g_current_first_arg_override = previous_override;
         return NULL;
     }
 
@@ -1063,24 +1360,71 @@ CompiledFunction* generateCodeFromFunction(Function* cfg_func) {
 
     namespace_internal_labels(compiled);
     g_current_function = NULL;
+    g_current_first_arg_override = previous_override;
     return compiled;
+}
+
+CompiledFunction* generateCodeFromFunction(Function* cfg_func) {
+    return generateCodeFromFunctionWithOverride(cfg_func, NULL);
+}
+
+static int append_compiled_function(CompiledFunctionCollection* collection,
+    CompiledFunction* compiled) {
+    CompiledFunction* resized;
+
+    if (!collection || !compiled) {
+        return 0;
+    }
+
+    if (collection->function_count >= collection->max_functions) {
+        collection->max_functions *= 2;
+        resized = (CompiledFunction*)realloc(collection->functions,
+            (size_t)collection->max_functions * sizeof(CompiledFunction));
+        if (!resized) {
+            return 0;
+        }
+        collection->functions = resized;
+    }
+
+    collection->functions[collection->function_count++] = *compiled;
+    return 1;
+}
+
+static void enqueue_initial_codegen_roots(FunctionCollection* functions) {
+    Function* func = functions ? functions->functions : NULL;
+
+    while (func) {
+        if (func->is_method ||
+            (func->signature && func->signature->name &&
+                strcmp(func->signature->name, "main") == 0) ||
+            !func->signature || !func->signature->args) {
+            enqueue_compile_request(func, NULL);
+        }
+        func = func->next;
+    }
 }
 
 /* Генерация кода сразу для всех функций программы */
 CompiledFunctionCollection* generateCodeFromAST(FunctionCollection* functions) {
     CompiledFunctionCollection* collection;
-    Function* func;
+    int i;
 
     if (!functions) {
         return NULL;
     }
+
+    g_all_functions = functions;
+    g_compile_queue.count = 0;
+    g_compile_queue.capacity = 0;
+    g_compile_queue.next_index = 0;
+    g_compile_queue.items = NULL;
 
     collection = (CompiledFunctionCollection*)malloc(sizeof(CompiledFunctionCollection));
     if (!collection) {
         return NULL;
     }
 
-    collection->max_functions = functions->function_count + 10;
+    collection->max_functions = functions->function_count + 16;
     collection->function_count = 0;
     collection->functions = (CompiledFunction*)malloc((size_t)collection->max_functions * sizeof(CompiledFunction));
     if (!collection->functions) {
@@ -1088,15 +1432,33 @@ CompiledFunctionCollection* generateCodeFromAST(FunctionCollection* functions) {
         return NULL;
     }
 
-    func = functions->functions;
-    while (func) {
-        CompiledFunction* compiled = generateCodeFromFunction(func);
+    enqueue_initial_codegen_roots(functions);
+
+    while (g_compile_queue.next_index < g_compile_queue.count) {
+        CompileRequest* request = &g_compile_queue.items[g_compile_queue.next_index++];
+        CompiledFunction* compiled =
+            generateCodeFromFunctionWithOverride(request->function, request->first_arg_override);
         if (compiled) {
-            collection->functions[collection->function_count++] = *compiled;
+            if (!append_compiled_function(collection, compiled)) {
+                free(compiled->generated_name);
+                freeLinearCode(compiled->code);
+                freeRegisterAllocator(compiled->alloc);
+                free(compiled);
+                break;
+            }
             free(compiled);
         }
-        func = func->next;
     }
+
+    for (i = 0; i < g_compile_queue.count; i++) {
+        free(g_compile_queue.items[i].first_arg_override);
+    }
+    free(g_compile_queue.items);
+    g_compile_queue.items = NULL;
+    g_compile_queue.count = 0;
+    g_compile_queue.capacity = 0;
+    g_compile_queue.next_index = 0;
+    g_all_functions = NULL;
 
     return collection;
 }
@@ -1106,6 +1468,7 @@ void freeCompiledFunction(CompiledFunction* func) {
     if (!func) {
         return;
     }
+    free(func->generated_name);
     if (func->code) {
         freeLinearCode(func->code);
     }
@@ -1124,6 +1487,7 @@ void freeCompiledFunctionCollection(CompiledFunctionCollection* collection) {
     }
 
     for (i = 0; i < collection->function_count; ++i) {
+        free(collection->functions[i].generated_name);
         if (collection->functions[i].code) {
             freeLinearCode(collection->functions[i].code);
         }

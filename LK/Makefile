@@ -33,6 +33,7 @@ TEST_BASIC = test_input/types_basic.src
 TEST_NESTED = test_input/types_nested.src
 TEST_METHOD = test_input/types_method.src
 TEST_INTERFACE = test_input/types_interface.src
+TEST_TEACHER = test_input/test_230526
 
 all: $(TARGETS)
 
@@ -113,6 +114,11 @@ test-interface:
 	mkdir -p $(GEN_DIR)/test_interface
 	./$(BIN_DIR)/run_compiler -o $(GEN_DIR)/test_interface $(TEST_INTERFACE)
 
+test-230526:
+	rm -rf $(GEN_DIR)/test_230526
+	mkdir -p $(GEN_DIR)/test_230526
+	./$(BIN_DIR)/run_compiler -o $(GEN_DIR)/test_230526 $(TEST_TEACHER)
+
 tests:
 	$(MAKE) run-input
 	$(MAKE) run-calc
@@ -128,4 +134,13 @@ vm-run: $(BIN_DIR)/run_compiler | $(GEN_DIR)
 	$(TT) -ws -g "$$id" -r out.ptptb -o out.ptptb; \
 	$(TT) -ws -il -s ExecuteBinaryWithInteractiveInput definitionFile vm.target.pdsl stdinRegStName sin stdoutRegStName sout archName vm binaryFileToRun out.ptptb ipRegStorageName ipst finishMnemonicName END codeRamBankName code_ram
 
-.PHONY: all clean rebuild run-input run-calc test test-nested test-method test-interface tests vm-run
+vm-test: $(BIN_DIR)/run_compiler | $(GEN_DIR)
+	rm -rf $(GEN_DIR)/test_230526
+	mkdir -p $(GEN_DIR)/test_230526
+	./$(BIN_DIR)/run_compiler -o $(GEN_DIR)/test_230526 $(TEST_TEACHER)
+	id="$$( $(TT) -ws -w -id -s Assemble asmListing $(GEN_DIR)/test_230526/program.asm definitionFile vm.target.pdsl archName vm | head -n 1 )"; \
+	$(TT) -ws -g "$$id" -r stdout.txt > $(GEN_DIR)/test_230526/assemble.stdout.txt; \
+	$(TT) -ws -g "$$id" -r out.ptptb -o $(GEN_DIR)/test_230526/out.ptptb; \
+	$(TT) -ws -il -s ExecuteBinaryWithInteractiveInput definitionFile vm.target.pdsl stdinRegStName sin stdoutRegStName sout archName vm binaryFileToRun $(GEN_DIR)/test_230526/out.ptptb ipRegStorageName ipst finishMnemonicName END codeRamBankName code_ram > $(GEN_DIR)/test_230526/stdout.txt
+
+.PHONY: all clean rebuild run-input run-calc test test-nested test-method test-interface test-230526 tests vm-run vm-test

@@ -67,6 +67,63 @@ static void formatAsmOperand(Operand* operand,
     }
 }
 
+static void emitAsmWriteByte(FILE* f, int value) {
+    if (!f) {
+        return;
+    }
+
+    fprintf(f, "MOV %d, r0\n", value);
+    fprintf(f, "CALL writeByte\n");
+}
+
+static void emitAsmString(FILE* f, const char* text) {
+    size_t i = 0;
+
+    if (!f || !text) {
+        return;
+    }
+
+    while (text[i] != '\0') {
+        unsigned char ch = (unsigned char)text[i];
+
+        if (ch == '\\' && text[i + 1] != '\0') {
+            switch (text[i + 1]) {
+            case 'n':
+                emitAsmWriteByte(f, 10);
+                i += 2;
+                continue;
+            case 'r':
+                emitAsmWriteByte(f, 13);
+                i += 2;
+                continue;
+            case 't':
+                emitAsmWriteByte(f, 9);
+                i += 2;
+                continue;
+            case '\\':
+                emitAsmWriteByte(f, '\\');
+                i += 2;
+                continue;
+            case '"':
+                emitAsmWriteByte(f, '"');
+                i += 2;
+                continue;
+            case '0':
+                emitAsmWriteByte(f, 0);
+                i += 2;
+                continue;
+            default:
+                emitAsmWriteByte(f, '\\');
+                i += 1;
+                continue;
+            }
+        }
+
+        emitAsmWriteByte(f, ch);
+        i += 1;
+    }
+}
+
 /* Печать одной asm-инструкции
  * Внутренние MOV для переменных здесь превращаются в LD/ST
  */
@@ -187,7 +244,7 @@ static void printAsmInstruction(FILE* f, Instruction* instr, RegisterAllocator* 
         fprintf(f, "OUT %s\n", op1);
         break;
     case INSTR_PRINT_STR:
-        fprintf(f, "; unsupported PRINT_STR %s\n", op1);
+        emitAsmString(f, instr->operand1.value.name ? instr->operand1.value.name : "");
         break;
     case INSTR_RET:
         if (instr->operand1.type == OPERAND_REGISTER && instr->operand1.value.register_id != 0) {
@@ -504,7 +561,9 @@ void exportAllCompiledFunctions(CompiledFunctionCollection* collection, const ch
     /* отдельный файл на каждую функцию */
     for (int i = 0; i < collection->function_count; i++) {
         CompiledFunction* func = &collection->functions[i];
-        const char* func_name = (func->signature && func->signature->name) ? func->signature->name : "unknown";
+        const char* func_name =
+            (func->generated_name && *func->generated_name) ? func->generated_name :
+            ((func->signature && func->signature->name) ? func->signature->name : "unknown");
 
         char filepath[1024];
         snprintf(filepath, sizeof(filepath), "%s/%s.linear_code.txt", output_directory, func_name);
